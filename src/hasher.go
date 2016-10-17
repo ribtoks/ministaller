@@ -7,21 +7,20 @@ import (
   "encoding/hex"
 )
 
-type FileHasher map[string]string
+func CalculateHash(filepath string) (<-chan string, <-chan error) {
+  resultChan := make(chan string)
+  errChan := make(chan error)
 
-func (fh *FileHasher) RetrieveHash(filepath string) (string, error) {
-  hash, ok := (*fh)[filepath];
-  if !ok {
+  go func() {
     filehash, err := calculateFileHash(filepath)
     if err != nil {
-      return "", err
+      errChan <- err
+    } else {
+      resultChan <- filehash
     }
+  }()
 
-    (*fh)[filepath] = filehash
-    hash = filehash
-  }
-
-  return hash, nil
+  return resultChan, errChan
 }
 
 func calculateFileHash(filepath string) (string, error) {
@@ -42,5 +41,3 @@ func calculateFileHash(filepath string) (string, error) {
   hexStr := hex.EncodeToString(hashBytes)
   return hexStr, nil
 }
-
-

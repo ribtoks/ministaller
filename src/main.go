@@ -88,6 +88,7 @@ func findUsefulDir(initialDir string) string {
     nextDir := path.Join(currDir, entries[0].Name())
     entries, err = ioutil.ReadDir(nextDir)
     if err != nil { return currDir }
+    currDir = nextDir
   }
 
   return currDir

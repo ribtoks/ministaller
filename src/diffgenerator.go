@@ -48,7 +48,7 @@ func (df *DiffGenerator) GenerateDiffs() error {
       df.filesToAdd = append(df.filesToAdd, fi)
     }
 
-    log.Printf("Found %v files to add\n", len(df.filesToAdd))
+    log.Printf("Found %v files to add", len(df.filesToAdd))
     wg.Done()
   }()
 
@@ -58,7 +58,7 @@ func (df *DiffGenerator) GenerateDiffs() error {
       df.filesToRemove = append(df.filesToRemove, fi)
     }
 
-    log.Printf("Found %v files to remove\n", len(df.filesToRemove))
+    log.Printf("Found %v files to remove", len(df.filesToRemove))
     wg.Done()
   }()
 
@@ -68,7 +68,7 @@ func (df *DiffGenerator) GenerateDiffs() error {
       df.filesToUpdate = append(df.filesToUpdate, fi)
     }
 
-    log.Printf("Found %v files to update\n", len(df.filesToUpdate))
+    log.Printf("Found %v files to update", len(df.filesToUpdate))
     wg.Done()
   }()
   
@@ -112,7 +112,7 @@ func (df *DiffGenerator) calculateHashes() error {
 }
 
 func (df *DiffGenerator) generateDirectoryDiff(installDir, packageDir string) {
-  log.Printf("Install dir: %v, packageDir: %v\n", installDir, packageDir);
+  log.Printf("Install dir: %v, packageDir: %v", installDir, packageDir);
 
   go df.findFilesToRemoveOrUpdate(installDir, packageDir)
   go df.findFilesToAdd(installDir, packageDir)

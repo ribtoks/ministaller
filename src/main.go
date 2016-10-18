@@ -6,7 +6,9 @@ import (
   "flag"
   "os"
   "errors"
+  "path"
   "io/ioutil"
+  "encoding/json"
 )
 
 // flags
@@ -46,6 +48,9 @@ func main() {
     log.Fatal(err)
   }
 
+  packageDirPath = findUsefulDir(packageDirPath)
+  log.Printf("Using %v for package path", packageDirPath)
+
   df := DiffGenerator{
     filesToAdd: make([]*UpdateFileInfo, 0),
     filesToRemove: make([]*UpdateFileInfo, 0),
@@ -65,6 +70,27 @@ func main() {
   if err != nil {
     log.Fatal(err)
   }
+
+  json, err := json.MarshalIndent(df.filesToAdd, "", "\t")
+  if err != nil {
+    log.Fatal("Cannot encode to JSON ", err)
+  }
+  fmt.Fprintf(os.Stdout, "%s", json)
+}
+
+func findUsefulDir(initialDir string) string {
+  entries, err := ioutil.ReadDir(initialDir)
+  if err != nil { return initialDir }
+
+  currDir := initialDir
+
+  for (len(entries) == 1) && (entries[0].IsDir()) {
+    nextDir := path.Join(currDir, entries[0].Name())
+    entries, err = ioutil.ReadDir(nextDir)
+    if err != nil { return currDir }
+  }
+
+  return currDir
 }
 
 func parseFlags() error {

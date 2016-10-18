@@ -8,8 +8,8 @@ import (
 )
 
 type UpdateFileInfo struct {
-  filepath string
-  sha1 string
+  Filepath string `json:"path"`
+  Sha1 string `json:"sha1"`
 }
 
 type UpdateFilesProvider interface {
@@ -48,7 +48,7 @@ func (df *DiffGenerator) GenerateDiffs() error {
       df.filesToAdd = append(df.filesToAdd, fi)
     }
 
-    log.Println("Finished processing files to add")
+    log.Printf("Found %v files to add\n", len(df.filesToAdd))
     wg.Done()
   }()
 
@@ -58,7 +58,7 @@ func (df *DiffGenerator) GenerateDiffs() error {
       df.filesToRemove = append(df.filesToRemove, fi)
     }
 
-    log.Println("Finished processing files to remove")
+    log.Printf("Found %v files to remove\n", len(df.filesToRemove))
     wg.Done()
   }()
 
@@ -68,7 +68,7 @@ func (df *DiffGenerator) GenerateDiffs() error {
       df.filesToUpdate = append(df.filesToUpdate, fi)
     }
 
-    log.Println("Finished processing files to update")
+    log.Printf("Found %v files to update\n", len(df.filesToUpdate))
     wg.Done()
   }()
   
@@ -103,8 +103,8 @@ func (df *DiffGenerator) calculateHashes() error {
     perrc <- err
   }()
 
-  log.Println("Hashes calculated")
-
+  defer log.Println("Hashes calculated")
+  
   if err := <- ierrc; err != nil { return err }
   if err := <- perrc; err != nil { return err }
 
@@ -138,8 +138,8 @@ func (df *DiffGenerator) findFilesToRemoveOrUpdate(installDir, packageDir string
       installFileHash := df.installDirHashes[relativePath]
 
       ufi := &UpdateFileInfo{
-        filepath: relativePath,
-        sha1: installFileHash }
+        Filepath: relativePath,
+        Sha1: installFileHash }
 
       if _, err := os.Stat(packagePath); os.IsNotExist(err) {
         if !df.keepMissing {
@@ -184,7 +184,7 @@ func (df *DiffGenerator) findFilesToAdd(installDir, packageDir string) {
     wg.Add(1)
 
     go func() {
-      relativePath, err := filepath.Rel(df.installDirPath, path)
+      relativePath, err := filepath.Rel(df.packageDirPath, path)
       if err != nil { log.Fatal(err) }
       installPath := filepath.Join(df.installDirPath, relativePath)
 
@@ -192,8 +192,8 @@ func (df *DiffGenerator) findFilesToAdd(installDir, packageDir string) {
         packageFileHash := df.packageDirHashes[relativePath]
         
         df.filesToAddQueue <- &UpdateFileInfo{
-          filepath: relativePath,
-          sha1: packageFileHash }
+          Filepath: relativePath,
+          Sha1: packageFileHash }
       }
 
       wg.Done()

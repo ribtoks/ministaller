@@ -15,7 +15,7 @@ type HashResult struct {
   err error
 }
 
-func CalculateHashes(root string) (map[string]string, err) {
+func CalculateHashes(root string) (map[string]string, error) {
   c, errc := calculateSha1Hashes(root)
 
   m := make(map[string]string)
@@ -24,8 +24,12 @@ func CalculateHashes(root string) (map[string]string, err) {
       return nil, r.err
     }
 
-    key := filepath.Rel(root, r.path)
-    m[key] = r.hash
+    key, err := filepath.Rel(root, r.path)
+    if err != nil {
+      return nil, err
+    } else {
+      m[key] = r.hash
+    }
   }
 
   if err := <- errc; err != nil {
@@ -58,6 +62,8 @@ func calculateSha1Hashes(root string) (<-chan HashResult, <-chan error) {
 
         wg.Done()
       }()
+
+      return nil
     })
 
     go func() {

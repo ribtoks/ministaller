@@ -8,6 +8,7 @@ import (
   "log"
   "sort"
   "io/ioutil"
+  "errors"
 )
 
 type PackageInstaller struct {
@@ -15,12 +16,13 @@ type PackageInstaller struct {
   installDir string
   packageDir string
   backupsDir string
+  failInTheEnd bool
 }
 
 func (pi *PackageInstaller) Install(filesProvider UpdateFilesProvider) error {
   err := pi.installPackage(filesProvider)
 
-  if err == nil {
+  if err == nil {    
     pi.afterSuccess()
   } else {
     pi.afterFailure(filesProvider)
@@ -43,6 +45,10 @@ func (pi *PackageInstaller) installPackage(filesProvider UpdateFilesProvider) (e
   }
 
   err = pi.addFiles(filesProvider.FilesToAdd())
+
+  if pi.failInTheEnd {
+    err = errors.New("Fail by demand")
+  }
 
   return err
 }

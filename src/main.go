@@ -20,6 +20,7 @@ var (
   keepMissingFlag = flag.Bool("keep-missing", false, "Keep files not found in the update package")
   logPathFlag = flag.String("l", "ministaller.log", "absolute path to log file")
   launchExeFlag = flag.String("launch-exe", "", "relative path to exe to launch after install")
+  failFlag = flag.Bool("fail", false, "Fail after install to test rollback")
 )
 
 const (
@@ -84,7 +85,8 @@ func main() {
     backups: make(map[string]string),
     installDir: *installPathFlag,
     packageDir: packageDirPath,
-    backupsDir: backupsDirPath }
+    backupsDir: backupsDirPath,
+    failInTheEnd: *failFlag }
 
   err := pi.Install(df)
   if err != nil {

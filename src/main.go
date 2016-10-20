@@ -9,6 +9,7 @@ import (
   "path"
   "io/ioutil"
   "encoding/json"
+  "os/exec"
 )
 
 // flags
@@ -18,6 +19,7 @@ var (
   forceUpdateFlag = flag.Bool("force-update", false, "Overwrite same files")
   keepMissingFlag = flag.Bool("keep-missing", false, "Keep files not found in the update package")
   logPathFlag = flag.String("l", "ministaller.log", "absolute path to log file")
+  launchExeFlag = flag.String("launch-exe", "", "relative path to exe to launch after install")
 )
 
 const (
@@ -71,11 +73,30 @@ func main() {
     log.Fatal(err)
   }
 
-  json, err := json.MarshalIndent(df.filesToAdd, "", "\t")
+  backupsDirPath, err := ioutil.TempDir("", appName)
   if err != nil {
-    log.Fatal("Cannot encode to JSON ", err)
+    log.Fatal(err)
   }
-  fmt.Fprintf(os.Stdout, "%s", json)
+
+  defer os.RemoveAll(backupsDirPath)
+
+  pi := PackageInstaller{
+    backups: make(map[string]string),
+    installDir: *installPathFlag,
+    packageDir: packageDirPath,
+    backupsDir: backupsDirPath }
+
+  err := pi.Install(df)
+  if err != nil {
+    log.Printf("Install failed: %v", err)
+    return
+  }
+  
+  log.Println("Install succeeded")
+  
+  if len(*launchExeFlag) > 0 {
+    launchPostInstallExe()
+  }
 }
 
 func findUsefulDir(initialDir string) string {
@@ -120,4 +141,15 @@ func setupLogging() (f *os.File, err error) {
   log.Println("Ministaller log started")
   
   return f, err
+}
+
+func launchPostInstallExe() {
+  fullpath := path.Join(*installPathFlag, *launchExeFlag)
+  log.Printf("Trying to launch %v", fullpath)
+  
+  cmd := exec.Command(fullpath, "")
+  err := cmd.Start()
+  if err != nil {
+    log.Println(err)
+  }
 }

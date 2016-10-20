@@ -5,18 +5,10 @@ import (
   "os"
   "fmt"
   "sync"
-  //"io/ioutil"
   "log"
+  "sort"
+  "io/ioutil"
 )
-
-func ensureDirExists(fullpath string) (err error) {
-  err = os.MkdirAll(path.Dir(fullpath), os.ModeDir)
-  return err
-}
-
-func cleanupEmptyDirs(root string) error {
-  return nil
-}
 
 type PackageInstaller struct {
   backups map[string]string
@@ -249,4 +241,74 @@ func (pi *PackageInstaller) removeFilesToAdd(files []*UpdateFileInfo) {
   }
 
   wg.Wait()
+}
+
+func ensureDirExists(fullpath string) (err error) {
+  err = os.MkdirAll(path.Dir(fullpath), os.ModeDir)
+  return err
+}
+
+type ByLength []string
+
+func (s ByLength) Len() int {
+    return len(s)
+}
+func (s ByLength) Swap(i, j int) {
+    s[i], s[j] = s[j], s[i]
+}
+func (s ByLength) Less(i, j int) bool {
+    return len(s[i]) > len(s[j])
+}
+
+func cleanupEmptyDirs(root string) error {
+  c := make(chan string)
+  
+  go func() {
+    var wg sync.WaitGroup
+    err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
+      if err != nil {
+        return err
+      }
+
+      if info.Mode().IsDir() {
+        wg.Add(1)
+        go func() {
+          c <- path
+          wg.Done()
+        }()
+      }
+      
+      return nil
+    })
+
+    go func() {
+      wg.Wait()
+      close(c)
+    }()
+  }()
+
+  dirs := make([]string)
+  for path := range c {
+    dirs = append(dirs, c)
+  }
+
+  removeEmptyDirs(dirs)
+}
+
+func removeEmptyDirs(dirs []string) {
+  sort.Sort(ByLength(dirs))
+
+  for _, dirpath := range dirs {
+    entries, err := ioutil.ReadDir(dirpath)
+    if err != nil { continue }
+
+    if len(entries) == 0 {
+      log.Printf("Removing empty dir %v", dirpath)
+      
+      err = os.Remove(dirpath)
+      if err != nil {
+        log.Prinln(err)
+      }
+    }
+  }
 }

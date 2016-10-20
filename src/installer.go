@@ -17,9 +17,48 @@ type PackageInstaller struct {
   backupsDir string
 }
 
-func (pi *PackageInstaller) installPackage(filesProvider UpdateFilesProvider) error {
-  _ = pi.removeFiles(filesProvider.FilesToRemove())
-  return nil
+func (pi *PackageInstaller) Install(filesProvider UpdateFilesProvider) error {
+  err := pi.installPackage(filesProvider)
+
+  if err == nil {
+    pi.afterSuccess()
+  } else {
+    pi.afterFailure(filesProvider)
+  }
+
+  return error
+}
+
+func (pi *PackageInstaller) installPackage(filesProvider UpdateFilesProvider) (err error) {
+  log.Println("Installing package...")
+  
+  err = pi.removeFiles(filesProvider.FilesToRemove())
+  if err != nil {
+    return err
+  }
+
+  err = pi.updateFiles(filesProvider.FilesToUpdate())
+  if err != nil {
+    return err
+  }
+
+  err = pi.addFiles(filesProvider.FilesToAdd())
+
+  return err
+}
+
+func (pi *PackageInstaller) afterSuccess() {
+  log.Println("After success")
+  cleanupEmptyDirs(pi.installDir)
+  pi.removeBackups();
+}
+
+func (pi *PackageInstaller) afterFailure(filesProvider UpdateFilesProvider) {
+  log.Println("After failure")
+  purgeFiles(pi.installDir, filesProvider.FilesToAdd())
+  pi.restoreBackups()
+  cleanupEmptyDirs(pi.installDir)
+  pi.removeBackups()
 }
 
 func (pi *PackageInstaller) backupFile(relpath string) error {
@@ -79,6 +118,11 @@ func (pi *PackageInstaller) removeBackups() {
   }
 
   wg.Wait()
+
+  err := os.RemoveAll(pi.backupsDir)
+  if err != nil {
+    log.Println(err)
+  }
 }
 
 func (pi *PackageInstaller) removeFiles(files []*UpdateFileInfo) error {
@@ -223,7 +267,9 @@ func (pi *PackageInstaller) addFiles(files []*UpdateFileInfo) error {
   return nil
 }
 
-func (pi *PackageInstaller) removeFilesToAdd(files []*UpdateFileInfo) {
+func purgeFiles(root string, files []*UpdateFileInfo) {
+  log.Printf("Purging %v files", len(files))
+  
   var wg sync.WaitGroup
 
   for _, fi := range files {
@@ -232,7 +278,7 @@ func (pi *PackageInstaller) removeFilesToAdd(files []*UpdateFileInfo) {
     go func() {
       defer wg.Done()
 
-      fullpath := path.Join(pi.installDir, fi.Filepath)
+      fullpath := path.Join(root, fi.Filepath)
       err := os.Remove(fullpath)
       if err != nil {
         log.Println(err)
@@ -280,6 +326,10 @@ func cleanupEmptyDirs(root string) error {
       
       return nil
     })
+
+    if err != nil {
+      log.Println(err)
+    }
 
     go func() {
       wg.Wait()

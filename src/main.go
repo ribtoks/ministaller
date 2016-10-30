@@ -5,10 +5,10 @@ import (
   "log"
   "flag"
   "os"
+  "io"
   "errors"
   "path"
   "io/ioutil"
-  "encoding/json"
   "os/exec"
 )
 
@@ -21,6 +21,7 @@ var (
   logPathFlag = flag.String("l", "ministaller.log", "absolute path to log file")
   launchExeFlag = flag.String("launch-exe", "", "relative path to exe to launch after install")
   failFlag = flag.Bool("fail", false, "Fail after install to test rollback")
+  stdoutFlag = flag.Bool("stdout", false, "Log to stdout and to logfile")
 )
 
 const (
@@ -88,14 +89,14 @@ func main() {
     backupsDir: backupsDirPath,
     failInTheEnd: *failFlag }
 
-  err := pi.Install(df)
+  err = pi.Install(df)
   if err != nil {
     log.Printf("Install failed: %v", err)
     return
   }
-  
+
   log.Println("Install succeeded")
-  
+
   if len(*launchExeFlag) > 0 {
     launchPostInstallExe()
   }
@@ -138,17 +139,23 @@ func setupLogging() (f *os.File, err error) {
     return nil, err
   }
 
-  log.SetOutput(f)
+  if *stdoutFlag {
+    mw := io.MultiWriter(os.Stdout, f)
+    log.SetOutput(mw)
+  } else {
+    log.SetOutput(f)
+  }
+
   log.Println("------------------------------")
   log.Println("Ministaller log started")
-  
+
   return f, err
 }
 
 func launchPostInstallExe() {
   fullpath := path.Join(*installPathFlag, *launchExeFlag)
   log.Printf("Trying to launch %v", fullpath)
-  
+
   cmd := exec.Command(fullpath, "")
   err := cmd.Start()
   if err != nil {

@@ -9,6 +9,7 @@ import (
   "sort"
   "io/ioutil"
   "errors"
+  "path/filepath"
 )
 
 type PackageInstaller struct {
@@ -22,18 +23,18 @@ type PackageInstaller struct {
 func (pi *PackageInstaller) Install(filesProvider UpdateFilesProvider) error {
   err := pi.installPackage(filesProvider)
 
-  if err == nil {    
+  if err == nil {
     pi.afterSuccess()
   } else {
     pi.afterFailure(filesProvider)
   }
 
-  return error
+  return err
 }
 
 func (pi *PackageInstaller) installPackage(filesProvider UpdateFilesProvider) (err error) {
   log.Println("Installing package...")
-  
+
   err = pi.removeFiles(filesProvider.FilesToRemove())
   if err != nil {
     return err
@@ -275,7 +276,7 @@ func (pi *PackageInstaller) addFiles(files []*UpdateFileInfo) error {
 
 func purgeFiles(root string, files []*UpdateFileInfo) {
   log.Printf("Purging %v files", len(files))
-  
+
   var wg sync.WaitGroup
 
   for _, fi := range files {
@@ -312,9 +313,9 @@ func (s ByLength) Less(i, j int) bool {
     return len(s[i]) > len(s[j])
 }
 
-func cleanupEmptyDirs(root string) error {
+func cleanupEmptyDirs(root string) {
   c := make(chan string)
-  
+
   go func() {
     var wg sync.WaitGroup
     err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
@@ -329,7 +330,7 @@ func cleanupEmptyDirs(root string) error {
           wg.Done()
         }()
       }
-      
+
       return nil
     })
 
@@ -343,9 +344,9 @@ func cleanupEmptyDirs(root string) error {
     }()
   }()
 
-  dirs := make([]string)
+  dirs := make([]string, 0)
   for path := range c {
-    dirs = append(dirs, c)
+    dirs = append(dirs, path)
   }
 
   removeEmptyDirs(dirs)
@@ -360,10 +361,10 @@ func removeEmptyDirs(dirs []string) {
 
     if len(entries) == 0 {
       log.Printf("Removing empty dir %v", dirpath)
-      
+
       err = os.Remove(dirpath)
       if err != nil {
-        log.Prinln(err)
+        log.Println(err)
       }
     }
   }

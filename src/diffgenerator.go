@@ -34,6 +34,18 @@ type DiffGenerator struct {
   forceUpdate bool
 }
 
+func (df DiffGenerator) FilesToAdd() []*UpdateFileInfo {
+  return df.filesToAdd
+}
+
+func (df DiffGenerator) FilesToUpdate() []*UpdateFileInfo {
+  return df.filesToUpdate
+}
+
+func (df DiffGenerator) FilesToRemove() []*UpdateFileInfo {
+  return df.filesToRemove
+}
+
 func (df *DiffGenerator) GenerateDiffs() error {
   err := df.calculateHashes()
   if err != nil {
@@ -53,7 +65,7 @@ func (df *DiffGenerator) GenerateDiffs() error {
   }()
 
   wg.Add(1)
-  go func() {    
+  go func() {
     for fi := range df.filesToRemoveQueue {
       df.filesToRemove = append(df.filesToRemove, fi)
     }
@@ -71,7 +83,7 @@ func (df *DiffGenerator) GenerateDiffs() error {
     log.Printf("Found %v files to update", len(df.filesToUpdate))
     wg.Done()
   }()
-  
+
   go df.generateDirectoryDiff(df.installDirPath, df.packageDirPath)
   go func() {
     wg.Wait()
@@ -87,7 +99,7 @@ func (df *DiffGenerator) GenerateDiffs() error {
 
 func (df *DiffGenerator) calculateHashes() error {
   log.Println("Calculating hashes...")
-  
+
   ierrc := make(chan error, 1)
   perrc := make(chan error, 1)
 
@@ -104,7 +116,7 @@ func (df *DiffGenerator) calculateHashes() error {
   }()
 
   defer log.Println("Hashes calculated")
-  
+
   if err := <- ierrc; err != nil { return err }
   if err := <- perrc; err != nil { return err }
 
@@ -190,7 +202,7 @@ func (df *DiffGenerator) findFilesToAdd(installDir, packageDir string) {
 
       if _, err := os.Stat(installPath); os.IsNotExist(err) {
         packageFileHash := df.packageDirHashes[relativePath]
-        
+
         df.filesToAddQueue <- &UpdateFileInfo{
           Filepath: relativePath,
           Sha1: packageFileHash }

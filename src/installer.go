@@ -13,8 +13,14 @@ import (
   "path/filepath"
 )
 
+type BackupPair struct {
+  relpath string
+  newpath string
+}
+
 type PackageInstaller struct {
   backups map[string]string
+  backupsChan chan BackupPair
   installDir string
   packageDir string
   backupsDir string
@@ -22,8 +28,6 @@ type PackageInstaller struct {
 }
 
 func (pi *PackageInstaller) Install(filesProvider UpdateFilesProvider) error {
-  log.Printf("Install dir: %v, Package dir: %v", pi.installDir, pi.packageDir)
-
   err := pi.installPackage(filesProvider)
 
   if err == nil {
@@ -37,6 +41,16 @@ func (pi *PackageInstaller) Install(filesProvider UpdateFilesProvider) error {
 
 func (pi *PackageInstaller) installPackage(filesProvider UpdateFilesProvider) (err error) {
   log.Println("Installing package...")
+  log.Printf("Backup dir: %v", pi.backupsDir)
+
+  var wg sync.WaitGroup
+  wg.Add(1)
+  go func() {
+    for bp := range pi.backupsChan {
+      pi.backups[bp.relpath] = bp.newpath
+    }
+    wg.Done()
+  }()
 
   err = pi.removeFiles(filesProvider.FilesToRemove())
   if err != nil {
@@ -49,6 +63,12 @@ func (pi *PackageInstaller) installPackage(filesProvider UpdateFilesProvider) (e
   }
 
   err = pi.addFiles(filesProvider.FilesToAdd())
+
+  go func() {
+    close(pi.backupsChan)
+  }()
+
+  wg.Wait()
 
   if pi.failInTheEnd {
     err = errors.New("Fail by demand")
@@ -72,15 +92,17 @@ func (pi *PackageInstaller) afterFailure(filesProvider UpdateFilesProvider) {
 }
 
 func copyFile(src, dst string) (err error) {
-    in, err := os.Open(src)
-    if err != nil {
-        return
-    }
+  in, err := os.Open(src)
+  if err != nil {
+    log.Printf("Failed to open source: %v", err)
+    return
+  }
 
-    defer in.Close()
+  defer in.Close()
 
   out, err := os.Create(dst)
   if err != nil {
+    log.Printf("Failed to create destination: %v", err)
     return
   }
 
@@ -100,6 +122,8 @@ func copyFile(src, dst string) (err error) {
 }
 
 func (pi *PackageInstaller) backupFile(relpath string) error {
+  log.Printf("Backing up %v", relpath)
+
   oldpath := path.Join(pi.installDir, relpath)
   backupPath := fmt.Sprintf("%v.bak", relpath)
 
@@ -109,7 +133,9 @@ func (pi *PackageInstaller) backupFile(relpath string) error {
   err := copyFile(oldpath, newpath)
 
   if err == nil {
-    pi.backups[relpath] = newpath
+    pi.backupsChan <- BackupPair{relpath: relpath, newpath: newpath}
+  } else {
+    log.Printf("Backup failed: %v", err)
   }
 
   return err
@@ -123,11 +149,14 @@ func (pi *PackageInstaller) restoreBackups() {
   for relpath, backuppath := range pi.backups {
     wg.Add(1)
 
+    relativePath := relpath
+    pathToRestore := backuppath
+
     go func() {
       defer wg.Done()
 
-      oldpath := path.Join(pi.installDir, relpath)
-      err := os.Rename(backuppath, oldpath)
+      oldpath := path.Join(pi.installDir, relativePath)
+      err := os.Rename(pathToRestore, oldpath)
 
       if err != nil {
         log.Println(err)
@@ -146,10 +175,12 @@ func (pi *PackageInstaller) removeBackups() {
   for _, backuppath := range pi.backups {
     wg.Add(1)
 
+    pathToRemove := backuppath
+
     go func() {
       defer wg.Done()
 
-      err := os.Remove(backuppath)
+      err := os.Remove(pathToRemove)
       if err != nil {
         log.Println(err)
       }
@@ -173,6 +204,7 @@ func (pi *PackageInstaller) removeFiles(files []*UpdateFileInfo) error {
 
   for _, fi := range files {
     wg.Add(1)
+    pathToRemove := fi.Filepath
 
     go func() {
       defer wg.Done()
@@ -182,16 +214,17 @@ func (pi *PackageInstaller) removeFiles(files []*UpdateFileInfo) error {
       default:
       }
 
-      fullpath := path.Join(pi.installDir, fi.Filepath)
+      fullpath := filepath.Join(pi.installDir, pathToRemove)
+      log.Printf("Removing file %v", fullpath)
 
-      err := pi.backupFile(fullpath)
+      err := pi.backupFile(pathToRemove)
 
       if err == nil {
         err = os.Remove(fullpath)
       }
 
       if err != nil {
-        log.Printf("Removing file %v failed", fi.Filepath)
+        log.Printf("Removing file %v failed", pathToRemove)
         log.Println(err)
         errc <- err
         close(done)
@@ -222,6 +255,8 @@ func (pi *PackageInstaller) updateFiles(files []*UpdateFileInfo) error {
   for _, fi := range files {
     wg.Add(1)
 
+    pathToUpdate := fi.Filepath
+
     go func() {
       defer wg.Done()
 
@@ -230,17 +265,17 @@ func (pi *PackageInstaller) updateFiles(files []*UpdateFileInfo) error {
       default:
       }
 
-      oldpath := path.Join(pi.installDir, fi.Filepath)
+      oldpath := path.Join(pi.installDir, pathToUpdate)
 
-      err := pi.backupFile(oldpath)
+      err := pi.backupFile(pathToUpdate)
 
       if err == nil {
-        newpath := path.Join(pi.packageDir, fi.Filepath)
+        newpath := path.Join(pi.packageDir, pathToUpdate)
         err = os.Rename(newpath, oldpath)
       }
 
       if err != nil {
-        log.Printf("Updating file %v failed", fi)
+        log.Printf("Updating file %v failed", pathToUpdate)
         log.Println(err)
         errc <- err
         close(done)
@@ -271,6 +306,8 @@ func (pi *PackageInstaller) addFiles(files []*UpdateFileInfo) error {
   for _, fi := range files {
     wg.Add(1)
 
+    pathToAdd := fi.Filepath
+
     go func() {
       defer wg.Done()
 
@@ -279,13 +316,14 @@ func (pi *PackageInstaller) addFiles(files []*UpdateFileInfo) error {
       default:
       }
 
-      oldpath := path.Join(pi.installDir, fi.Filepath)
+      oldpath := path.Join(pi.installDir, pathToAdd)
+      ensureDirExists(oldpath)
 
-      newpath := path.Join(pi.packageDir, fi.Filepath)
+      newpath := path.Join(pi.packageDir, pathToAdd)
       err := os.Rename(newpath, oldpath)
 
       if err != nil {
-        log.Printf("Adding file %v failed", fi)
+        log.Printf("Adding file %v failed", pathToAdd)
         log.Println(err)
         errc <- err
         close(done)
@@ -314,10 +352,12 @@ func purgeFiles(root string, files []*UpdateFileInfo) {
   for _, fi := range files {
     wg.Add(1)
 
+    fileToPurge := fi.Filepath
+
     go func() {
       defer wg.Done()
 
-      fullpath := path.Join(root, fi.Filepath)
+      fullpath := path.Join(root, fileToPurge)
       err := os.Remove(fullpath)
       if err != nil {
         log.Println(err)
@@ -329,7 +369,12 @@ func purgeFiles(root string, files []*UpdateFileInfo) {
 }
 
 func ensureDirExists(fullpath string) (err error) {
-  err = os.MkdirAll(path.Dir(fullpath), os.ModeDir)
+  dirpath := path.Dir(fullpath)
+  err = os.MkdirAll(dirpath, os.ModeDir)
+  if err != nil {
+    log.Printf("Failed to create directory %v", dirpath)
+  }
+
   return err
 }
 

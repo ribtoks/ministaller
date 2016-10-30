@@ -8,6 +8,7 @@ import (
   "io"
   "errors"
   "path"
+  "path/filepath"
   "io/ioutil"
   "os/exec"
 )
@@ -53,7 +54,11 @@ func main() {
   }
 
   packageDirPath = findUsefulDir(packageDirPath)
+  packageDirPath = filepath.ToSlash(packageDirPath)
   log.Printf("Using %v for package path", packageDirPath)
+
+  installDirPath := filepath.ToSlash(*installPathFlag)
+  log.Printf("Using %v for install path", installDirPath)
 
   df := DiffGenerator{
     filesToAdd: make([]*UpdateFileInfo, 0),
@@ -65,7 +70,7 @@ func main() {
     errors: make(chan error, 1),
     installDirHashes: make(map[string]string),
     packageDirHashes: make(map[string]string),
-    installDirPath: *installPathFlag,
+    installDirPath: installDirPath,
     packageDirPath: packageDirPath,
     keepMissing: *keepMissingFlag,
     forceUpdate: *forceUpdateFlag }
@@ -80,11 +85,14 @@ func main() {
     log.Fatal(err)
   }
 
+  backupsDirPath = filepath.ToSlash(backupsDirPath)
+
   defer os.RemoveAll(backupsDirPath)
 
   pi := PackageInstaller{
     backups: make(map[string]string),
-    installDir: *installPathFlag,
+    backupsChan: make(chan BackupPair),
+    installDir: installDirPath,
     packageDir: packageDirPath,
     backupsDir: backupsDirPath,
     failInTheEnd: *failFlag }

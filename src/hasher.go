@@ -28,6 +28,7 @@ func CalculateHashes(root string) (map[string]string, error) {
     if err != nil {
       return nil, err
     } else {
+      key = filepath.ToSlash(key)
       m[key] = r.hash
     }
   }

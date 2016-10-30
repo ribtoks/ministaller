@@ -132,6 +132,7 @@ func (df *DiffGenerator) generateDirectoryDiff(installDir, packageDir string) {
 
 func (df *DiffGenerator) findFilesToRemoveOrUpdate(installDir, packageDir string) {
   var wg sync.WaitGroup
+
   err := filepath.Walk(installDir, func(path string, info os.FileInfo, err error) error {
     if err != nil {
       return err
@@ -146,6 +147,7 @@ func (df *DiffGenerator) findFilesToRemoveOrUpdate(installDir, packageDir string
     go func() {
       relativePath, err := filepath.Rel(df.installDirPath, path)
       if err != nil { log.Fatal(err) }
+      relativePath = filepath.ToSlash(relativePath)
       packagePath := filepath.Join(df.packageDirPath, relativePath)
       installFileHash := df.installDirHashes[relativePath]
 
@@ -198,6 +200,7 @@ func (df *DiffGenerator) findFilesToAdd(installDir, packageDir string) {
     go func() {
       relativePath, err := filepath.Rel(df.packageDirPath, path)
       if err != nil { log.Fatal(err) }
+      relativePath = filepath.ToSlash(relativePath)
       installPath := filepath.Join(df.installDirPath, relativePath)
 
       if _, err := os.Stat(installPath); os.IsNotExist(err) {

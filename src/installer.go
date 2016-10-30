@@ -7,6 +7,7 @@ import (
   "sync"
   "log"
   "sort"
+  "io"
   "io/ioutil"
   "errors"
   "path/filepath"
@@ -21,6 +22,8 @@ type PackageInstaller struct {
 }
 
 func (pi *PackageInstaller) Install(filesProvider UpdateFilesProvider) error {
+  log.Printf("Install dir: %v, Package dir: %v", pi.installDir, pi.packageDir)
+
   err := pi.installPackage(filesProvider)
 
   if err == nil {
@@ -68,6 +71,34 @@ func (pi *PackageInstaller) afterFailure(filesProvider UpdateFilesProvider) {
   pi.removeBackups()
 }
 
+func copyFile(src, dst string) (err error) {
+    in, err := os.Open(src)
+    if err != nil {
+        return
+    }
+
+    defer in.Close()
+
+  out, err := os.Create(dst)
+  if err != nil {
+    return
+  }
+
+  defer func() {
+    cerr := out.Close()
+    if err == nil {
+      err = cerr
+    }
+  }()
+
+  if _, err = io.Copy(out, in); err != nil {
+    return
+  }
+
+  err = out.Sync()
+  return
+}
+
 func (pi *PackageInstaller) backupFile(relpath string) error {
   oldpath := path.Join(pi.installDir, relpath)
   backupPath := fmt.Sprintf("%v.bak", relpath)
@@ -75,7 +106,8 @@ func (pi *PackageInstaller) backupFile(relpath string) error {
   newpath := path.Join(pi.backupsDir, backupPath)
   ensureDirExists(newpath)
 
-  err := os.Rename(oldpath, newpath)
+  err := copyFile(oldpath, newpath)
+
   if err == nil {
     pi.backups[relpath] = newpath
   }
@@ -159,7 +191,7 @@ func (pi *PackageInstaller) removeFiles(files []*UpdateFileInfo) error {
       }
 
       if err != nil {
-        log.Printf("Removing file %v failed", fi)
+        log.Printf("Removing file %v failed", fi.Filepath)
         log.Println(err)
         errc <- err
         close(done)

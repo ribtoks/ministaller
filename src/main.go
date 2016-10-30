@@ -25,6 +25,7 @@ var (
   failFlag = flag.Bool("fail", false, "Fail after install to test rollback")
   stdoutFlag = flag.Bool("stdout", false, "Log to stdout and to logfile")
   urlFlag = flag.String("url", "", "Url to the package")
+  hashFlag = flag.String("hash", "", "Hash of the downloaded file to check")
 )
 
 const (
@@ -52,7 +53,18 @@ func main() {
     }
 
     defer os.Remove(localPath)
-    pathToArchive = localPath
+
+    hash, err := calculateFileHash(localPath)
+    if err != nil {
+      log.Println(err.Error())
+    } else {
+      if hash != *hashFlag {
+        log.Printf("Hash mismatch! %v expected but %v found", *hashFlag, hash)
+      } else {
+        log.Println("Download succeeded")
+        pathToArchive = localPath
+      }
+    }
   }
 
   packageDirPath, err := ioutil.TempDir("", appName)
@@ -147,9 +159,11 @@ func parseFlags() error {
   if os.IsNotExist(err) { return err }
   if !installFileInfo.IsDir() { return errors.New("install-path does not point to a directory") }
 
-  packageFileInfo, err := os.Stat(*packagePathFlag)
-  if os.IsNotExist(err) { return err }
-  if packageFileInfo.IsDir() { return errors.New("package-path should point to a file") }
+  if len(*urlFlag) == 0 {
+    packageFileInfo, err := os.Stat(*packagePathFlag)
+    if os.IsNotExist(err) { return err }
+    if packageFileInfo.IsDir() { return errors.New("package-path should point to a file") }
+  }
 
   return nil
 }
@@ -186,10 +200,12 @@ func downloadFile(remoteAddr string) (filepath string, err error) {
   resp, err := http.Get(remoteAddr)
   defer resp.Body.Close()
 
-  _, err = io.Copy(tempfile, resp.Body)
+  n, err := io.Copy(tempfile, resp.Body)
   if err != nil {
     return "", err
   }
+
+  log.Printf("Downloaded %v bytes", n)
 
   return tempfile.Name(), nil
 }

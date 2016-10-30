@@ -11,6 +11,7 @@ import (
   "path/filepath"
   "io/ioutil"
   "os/exec"
+  "net/http"
 )
 
 // flags
@@ -23,6 +24,7 @@ var (
   launchExeFlag = flag.String("launch-exe", "", "relative path to exe to launch after install")
   failFlag = flag.Bool("fail", false, "Fail after install to test rollback")
   stdoutFlag = flag.Bool("stdout", false, "Log to stdout and to logfile")
+  urlFlag = flag.String("url", "", "Url to the package")
 )
 
 const (
@@ -41,6 +43,18 @@ func main() {
     defer logfile.Close()
   }
 
+  pathToArchive := *packagePathFlag
+
+  if len(*urlFlag) > 0 {
+    localPath, err := downloadFile(*urlFlag)
+    if err != nil {
+      log.Fatal(err.Error())
+    }
+
+    defer os.Remove(localPath)
+    pathToArchive = localPath
+  }
+
   packageDirPath, err := ioutil.TempDir("", appName)
   if err != nil {
     log.Fatal(err)
@@ -48,7 +62,7 @@ func main() {
 
   defer os.RemoveAll(packageDirPath)
 
-  err = Unzip(*packagePathFlag, packageDirPath)
+  err = Unzip(pathToArchive, packageDirPath)
   if err != nil {
     log.Fatal(err)
   }
@@ -158,6 +172,26 @@ func setupLogging() (f *os.File, err error) {
   log.Println("Ministaller log started")
 
   return f, err
+}
+
+func downloadFile(remoteAddr string) (filepath string, err error) {
+  log.Printf("Downloading %v", remoteAddr)
+
+  tempfile, err := ioutil.TempFile("", appName)
+  if err != nil {
+    return "", err
+  }
+  defer tempfile.Close()
+
+  resp, err := http.Get(remoteAddr)
+  defer resp.Body.Close()
+
+  _, err = io.Copy(tempfile, resp.Body)
+  if err != nil {
+    return "", err
+  }
+
+  return tempfile.Name(), nil
 }
 
 func launchPostInstallExe() {

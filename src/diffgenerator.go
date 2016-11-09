@@ -158,7 +158,8 @@ func (df *DiffGenerator) findFilesToRemoveOrUpdate(installDir, packageDir string
 
       if pfi, err := os.Stat(packagePath); os.IsNotExist(err) {
         if !df.keepMissing {
-          ufi.FileSize = pfi.Size()
+          efi, _ := os.Stat(path)
+          ufi.FileSize = efi.Size()
           df.filesToRemoveQueue <- ufi
         }
       } else {

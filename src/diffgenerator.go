@@ -209,11 +209,12 @@ func (df *DiffGenerator) findFilesToAdd(installDir, packageDir string) {
 
       if pfi, err := os.Stat(installPath); os.IsNotExist(err) {
         packageFileHash := df.packageDirHashes[relativePath]
+        efi, _ := os.Stat(path)
 
         df.filesToAddQueue <- &UpdateFileInfo{
           Filepath: relativePath,
           Sha1: packageFileHash,
-          FileSize: pfi.Size(),
+          FileSize: efi.Size(),
         }
       }
 

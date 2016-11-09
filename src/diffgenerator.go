@@ -207,7 +207,7 @@ func (df *DiffGenerator) findFilesToAdd(installDir, packageDir string) {
       relativePath = filepath.ToSlash(relativePath)
       installPath := filepath.Join(df.installDirPath, relativePath)
 
-      if pfi, err := os.Stat(installPath); os.IsNotExist(err) {
+      if _, err := os.Stat(installPath); os.IsNotExist(err) {
         packageFileHash := df.packageDirHashes[relativePath]
         efi, _ := os.Stat(path)
 

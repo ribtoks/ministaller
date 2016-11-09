@@ -26,6 +26,7 @@ var (
   stdoutFlag = flag.Bool("stdout", false, "Log to stdout and to logfile")
   urlFlag = flag.String("url", "", "Url to the package")
   hashFlag = flag.String("hash", "", "Hash of the downloaded file to check")
+  winUIFlag = flag.Bool("winui", false, "Show simple Windows UI")
 )
 
 const (
@@ -115,9 +116,17 @@ func main() {
 
   defer os.RemoveAll(backupsDirPath)
 
+  progressReporter := &ProgressReporter{
+    progressChan: make(chan int64),
+    reportingChan: make(chan bool),
+  }
+
+  go progressReporter.receiveUpdates(onPercentUpdate)
+
   pi := PackageInstaller{
     backups: make(map[string]string),
     backupsChan: make(chan BackupPair),
+    progressReporter: progressReporter,
     installDir: installDirPath,
     packageDir: packageDirPath,
     backupsDir: backupsDirPath,
@@ -219,4 +228,8 @@ func launchPostInstallExe() {
   if err != nil {
     log.Println(err)
   }
+}
+
+func onPercentUpdate(percent int) {
+  log.Printf("Completed %v%%...", percent);
 }

@@ -13,30 +13,67 @@ import (
   "path/filepath"
 )
 
+const (
+  RemoveFactor = 130 // 1.3
+  UpdateFactor = 200 // 2.0
+  AddFactor = 100 // 1.0
+)
+
 type BackupPair struct {
   relpath string
   newpath string
 }
 
+type ProgressReporter struct {
+  grandTotal uint64
+  currentProgress uint64
+  progressChan chan int64
+  percent int //0..100
+  reportingChan chan bool 
+}
+
 type PackageInstaller struct {
   backups map[string]string
   backupsChan chan BackupPair
+  progressReporter *ProgressReporter
   installDir string
   packageDir string
   backupsDir string
-  failInTheEnd bool
+  failInTheEnd bool // for debugging purposes
 }
 
 func (pi *PackageInstaller) Install(filesProvider UpdateFilesProvider) error {
+  pi.progressReporter.grandTotal = pi.calculateGrandTotals(filesProvider)
+  go pi.progressReporter.reportingLoop()
+  defer close(pi.progressReporter.progressChan)
+  
   err := pi.installPackage(filesProvider)
 
   if err == nil {
     pi.afterSuccess()
   } else {
     pi.afterFailure(filesProvider)
-  }
+  }  
 
   return err
+}
+
+func (pi *PackageInstaller) calculateGrandTotals(filesProvider UpdateFilesProvider) uint64 {
+  var sum uint64
+
+  for _, fi := range filesProvider.FilesToRemove() {
+    sum += uint64(fi.FileSize * RemoveFactor) / 100
+  }
+
+  for _, fi := range filesProvider.FilesToUpdate() {
+    sum += uint64(fi.FileSize * UpdateFactor) / 100
+  }
+
+  for _, fi := range filesProvider.FilesToAdd() {
+    sum += uint64(fi.FileSize * AddFactor) / 100
+  }
+
+  return sum
 }
 
 func (pi *PackageInstaller) installPackage(filesProvider UpdateFilesProvider) (err error) {
@@ -204,7 +241,7 @@ func (pi *PackageInstaller) removeFiles(files []*UpdateFileInfo) error {
 
   for _, fi := range files {
     wg.Add(1)
-    pathToRemove := fi.Filepath
+    pathToRemove, filesize := fi.Filepath, fi.FileSize
 
     go func() {
       defer wg.Done()
@@ -222,6 +259,8 @@ func (pi *PackageInstaller) removeFiles(files []*UpdateFileInfo) error {
       if err == nil {
         err = os.Remove(fullpath)
       }
+
+      go pi.progressReporter.accountRemove(filesize)
 
       if err != nil {
         log.Printf("Removing file %v failed", pathToRemove)
@@ -255,7 +294,7 @@ func (pi *PackageInstaller) updateFiles(files []*UpdateFileInfo) error {
   for _, fi := range files {
     wg.Add(1)
 
-    pathToUpdate := fi.Filepath
+    pathToUpdate, filesize := fi.Filepath, fi.FileSize
 
     go func() {
       defer wg.Done()
@@ -273,6 +312,8 @@ func (pi *PackageInstaller) updateFiles(files []*UpdateFileInfo) error {
         newpath := path.Join(pi.packageDir, pathToUpdate)
         err = os.Rename(newpath, oldpath)
       }
+
+      go pi.progressReporter.accountUpdate(filesize)
 
       if err != nil {
         log.Printf("Updating file %v failed", pathToUpdate)
@@ -306,7 +347,7 @@ func (pi *PackageInstaller) addFiles(files []*UpdateFileInfo) error {
   for _, fi := range files {
     wg.Add(1)
 
-    pathToAdd := fi.Filepath
+    pathToAdd, filesize := fi.Filepath, fi.FileSize
 
     go func() {
       defer wg.Done()
@@ -321,6 +362,8 @@ func (pi *PackageInstaller) addFiles(files []*UpdateFileInfo) error {
 
       newpath := path.Join(pi.packageDir, pathToAdd)
       err := os.Rename(newpath, oldpath)
+
+      go pi.progressReporter.accountAdd(filesize)
 
       if err != nil {
         log.Printf("Adding file %v failed", pathToAdd)
@@ -444,5 +487,38 @@ func removeEmptyDirs(dirs []string) {
         log.Println(err)
       }
     }
+  }
+}
+
+func (pr *ProgressReporter) accountRemove(progress int64) {
+  pr.progressChan <- (progress*RemoveFactor)/100
+}
+
+func (pr *ProgressReporter) accountUpdate(progress int64) {
+  pr.progressChan <- (progress*UpdateFactor)/100
+}
+
+func (pr *ProgressReporter) accountAdd(progress int64) {
+  pr.progressChan <- (progress*AddFactor)/100
+}
+
+func (pr *ProgressReporter) reportingLoop() {
+  for chunk := range pr.progressChan {
+    pr.currentProgress += uint64(chunk)
+
+    percent := (pr.currentProgress*100) / pr.grandTotal
+    pr.percent = int(percent)
+    
+    go func() {
+      pr.reportingChan <- true
+    }()
+  }
+
+  close(pr.reportingChan)
+}
+
+func (pr *ProgressReporter) receiveUpdates(updateHandler func(value int)) {
+  for _ = range pr.reportingChan {
+    updateHandler(pr.percent)
   }
 }

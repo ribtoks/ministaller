@@ -10,6 +10,7 @@ import (
 type UpdateFileInfo struct {
   Filepath string `json:"path"`
   Sha1 string `json:"sha1"`
+  FileSize int64 `json:"size"`
 }
 
 type UpdateFilesProvider interface {
@@ -155,14 +156,16 @@ func (df *DiffGenerator) findFilesToRemoveOrUpdate(installDir, packageDir string
         Filepath: relativePath,
         Sha1: installFileHash }
 
-      if _, err := os.Stat(packagePath); os.IsNotExist(err) {
+      if pfi, err := os.Stat(packagePath); os.IsNotExist(err) {
         if !df.keepMissing {
+          ufi.FileSize = pfi.Size()
           df.filesToRemoveQueue <- ufi
         }
       } else {
         packageFileHash := df.packageDirHashes[relativePath]
 
         if (packageFileHash != installFileHash) || (df.forceUpdate) {
+          ufi.FileSize = pfi.Size()
           df.filesToUpdateQueue <- ufi
         }
       }
@@ -203,12 +206,14 @@ func (df *DiffGenerator) findFilesToAdd(installDir, packageDir string) {
       relativePath = filepath.ToSlash(relativePath)
       installPath := filepath.Join(df.installDirPath, relativePath)
 
-      if _, err := os.Stat(installPath); os.IsNotExist(err) {
+      if pfi, err := os.Stat(installPath); os.IsNotExist(err) {
         packageFileHash := df.packageDirHashes[relativePath]
 
         df.filesToAddQueue <- &UpdateFileInfo{
           Filepath: relativePath,
-          Sha1: packageFileHash }
+          Sha1: packageFileHash,
+          FileSize: pfi.Size(),
+        }
       }
 
       wg.Done()

@@ -29,7 +29,8 @@ type ProgressReporter struct {
   currentProgress uint64
   progressChan chan int64
   percent int //0..100
-  reportingChan chan bool 
+  reportingChan chan bool
+  systemMessageChan chan string
 }
 
 type PackageInstaller struct {
@@ -89,17 +90,23 @@ func (pi *PackageInstaller) installPackage(filesProvider UpdateFilesProvider) (e
     wg.Done()
   }()
 
+  pi.progressReporter.systemMessageChan <- "Removing components"
   err = pi.removeFiles(filesProvider.FilesToRemove())
   if err != nil {
     return err
   }
 
+  pi.progressReporter.systemMessageChan <- "Updating components"
   err = pi.updateFiles(filesProvider.FilesToUpdate())
   if err != nil {
     return err
   }
 
+  pi.progressReporter.systemMessageChan <- "Adding components"
   err = pi.addFiles(filesProvider.FilesToAdd())
+  if err != nil {
+    return err
+  }
 
   go func() {
     close(pi.backupsChan)
@@ -116,12 +123,14 @@ func (pi *PackageInstaller) installPackage(filesProvider UpdateFilesProvider) (e
 
 func (pi *PackageInstaller) afterSuccess() {
   log.Println("After success")
+  pi.progressReporter.systemMessageChan <- "Finishing the installation..."
   cleanupEmptyDirs(pi.installDir)
   pi.removeBackups();
 }
 
 func (pi *PackageInstaller) afterFailure(filesProvider UpdateFilesProvider) {
   log.Println("After failure")
+  pi.progressReporter.systemMessageChan <- "Cleaning up..."
   purgeFiles(pi.installDir, filesProvider.FilesToAdd())
   pi.restoreBackups()
   cleanupEmptyDirs(pi.installDir)

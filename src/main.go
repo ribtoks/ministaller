@@ -119,7 +119,14 @@ func main() {
   progressReporter := &ProgressReporter{
     progressChan: make(chan int64),
     reportingChan: make(chan bool),
+    systemMessageChan: make(chan string),
   }
+
+  go func() {
+    for msg := range progressReporter.systemMessageChan {
+      log.Println("System message: " + msg)
+    }
+  }()
 
   go progressReporter.receiveUpdates(onPercentUpdate)
 

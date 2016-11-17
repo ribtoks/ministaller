@@ -47,14 +47,14 @@ func (pi *PackageInstaller) Install(filesProvider UpdateFilesProvider) error {
   pi.progressReporter.grandTotal = pi.calculateGrandTotals(filesProvider)
   go pi.progressReporter.reportingLoop()
   defer close(pi.progressReporter.progressChan)
-  
+
   err := pi.installPackage(filesProvider)
 
   if err == nil {
     pi.afterSuccess()
   } else {
     pi.afterFailure(filesProvider)
-  }  
+  }
 
   return err
 }
@@ -517,7 +517,7 @@ func (pr *ProgressReporter) reportingLoop() {
 
     percent := (pr.currentProgress*100) / pr.grandTotal
     pr.percent = int(percent)
-    
+
     go func() {
       pr.reportingChan <- true
     }()
@@ -529,5 +529,11 @@ func (pr *ProgressReporter) reportingLoop() {
 func (pr *ProgressReporter) receiveUpdates(updateHandler func(value int)) {
   for _ = range pr.reportingChan {
     updateHandler(pr.percent)
+  }
+}
+
+func (pr *ProgressReporter) receiveSystemMessages(messageHandler func(value string)) {
+  for msg := range pr.systemMessageChan {
+    messageHandler(msg)
   }
 }

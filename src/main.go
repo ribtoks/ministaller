@@ -122,12 +122,7 @@ func main() {
     systemMessageChan: make(chan string),
   }
 
-  go func() {
-    for msg := range progressReporter.systemMessageChan {
-      log.Println("System message: " + msg)
-    }
-  }()
-
+  go progressReporter.receiveSystemMessages(onSystemMessage)
   go progressReporter.receiveUpdates(onPercentUpdate)
 
   pi := PackageInstaller{
@@ -239,4 +234,8 @@ func launchPostInstallExe() {
 
 func onPercentUpdate(percent int) {
   log.Printf("Completed %v%%...", percent);
+}
+
+func onSystemMessage(message string) {
+  log.Println("System message: " + message)
 }

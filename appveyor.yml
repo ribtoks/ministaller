@@ -9,6 +9,9 @@ skip_commits:
 # clone directory
 clone_folder: c:\projects\ministaller
 
+environment:
+  GOPATH: c:\gopath
+
 clone_depth: 3                      # clone entire repository history if not defined
 
 before_build:

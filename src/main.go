@@ -26,7 +26,7 @@ var (
   stdoutFlag = flag.Bool("stdout", false, "Log to stdout and to logfile")
   urlFlag = flag.String("url", "", "Url to the package")
   hashFlag = flag.String("hash", "", "Hash of the downloaded file to check")
-  winUIFlag = flag.Bool("winui", false, "Show simple Windows UI")
+  showUIFlag = flag.Bool("gui", false, "Show simple progress GUI")
 )
 
 const (
@@ -87,7 +87,7 @@ func main() {
   installDirPath := filepath.ToSlash(*installPathFlag)
   log.Printf("Using %v for install path", installDirPath)
 
-  df := DiffGenerator{
+  df := &DiffGenerator{
     filesToAdd: make([]*UpdateFileInfo, 0),
     filesToRemove: make([]*UpdateFileInfo, 0),
     filesToUpdate: make([]*UpdateFileInfo, 0),
@@ -120,12 +120,14 @@ func main() {
     progressChan: make(chan int64),
     reportingChan: make(chan bool),
     systemMessageChan: make(chan string),
+    finished: make(chan bool),
   }
 
   go progressReporter.receiveSystemMessages(onSystemMessage)
   go progressReporter.receiveUpdates(onPercentUpdate)
+  go progressReporter.receiveFinish(onFinished)
 
-  pi := PackageInstaller{
+  pi := &PackageInstaller{
     backups: make(map[string]string),
     backupsChan: make(chan BackupPair),
     progressReporter: progressReporter,
@@ -134,16 +136,24 @@ func main() {
     backupsDir: backupsDirPath,
     failInTheEnd: *failFlag }
 
-  err = pi.Install(df)
-  if err != nil {
-    log.Printf("Install failed: %v", err)
-    return
+  if *showUIFlag {
+    go doInstall(pi, df)
+    guiloop()
+  } else {
+    doInstall(pi, df)
   }
+}
 
-  log.Println("Install succeeded")
+func doInstall(pi *PackageInstaller, df *DiffGenerator) {
+  err := pi.Install(df)
 
-  if len(*launchExeFlag) > 0 {
-    launchPostInstallExe()
+  if err == nil {
+    log.Println("Install succeeded")
+    if len(*launchExeFlag) > 0 {
+      launchPostInstallExe()
+    }
+  } else {
+    log.Printf("Install failed: %v", err)
   }
 }
 
@@ -230,12 +240,4 @@ func launchPostInstallExe() {
   if err != nil {
     log.Println(err)
   }
-}
-
-func onPercentUpdate(percent int) {
-  log.Printf("Completed %v%%...", percent);
-}
-
-func onSystemMessage(message string) {
-  log.Println("System message: " + message)
 }

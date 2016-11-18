@@ -31,6 +31,7 @@ type ProgressReporter struct {
   percent int //0..100
   reportingChan chan bool
   systemMessageChan chan string
+  finished chan bool
 }
 
 type PackageInstaller struct {
@@ -47,6 +48,11 @@ func (pi *PackageInstaller) Install(filesProvider UpdateFilesProvider) error {
   pi.progressReporter.grandTotal = pi.calculateGrandTotals(filesProvider)
   go pi.progressReporter.reportingLoop()
   defer close(pi.progressReporter.progressChan)
+  defer func() {
+    go func () {
+      pi.progressReporter.finished <- true
+    }()
+  }()
 
   err := pi.installPackage(filesProvider)
 
@@ -536,4 +542,9 @@ func (pr *ProgressReporter) receiveSystemMessages(messageHandler func(value stri
   for msg := range pr.systemMessageChan {
     messageHandler(msg)
   }
+}
+
+func (pr *ProgressReporter) receiveFinish(handler func()) {
+  <- pr.finished
+  handler()
 }

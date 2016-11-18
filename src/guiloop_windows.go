@@ -2,6 +2,7 @@ package main
 
 import (
   "github.com/Ribtoks/gform"
+  "github.com/Ribtoks/w32"
 )
 
 var (
@@ -29,12 +30,12 @@ func guiloop() {
   gform.Init()
 
   mw := gform.NewForm(nil)
-  mw.SetSize(360, 100)
-  mw.SetCaption("Progress bar")
+  mw.SetSize(360, 125)
+  mw.SetCaption("ministaller")
   mw.EnableMaxButton(false)
   mw.EnableSizable(false)
   mw.OnClose().Bind(func (arg *gform.EventArg) {
-    
+    gform.MsgBox(arg.Sender().Parent(), "Info", "Please wait for the installation to finish", w32.MB_OK | w32.MB_ICONWARNING)
   });
 
   lb = gform.NewLabel(mw)

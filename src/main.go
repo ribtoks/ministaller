@@ -123,9 +123,11 @@ func main() {
     finished: make(chan bool),
   }
 
-  go progressReporter.receiveSystemMessages(onSystemMessage)
-  go progressReporter.receiveUpdates(onPercentUpdate)
-  go progressReporter.receiveFinish(onFinished)
+  if *showUIFlag {
+    go handleProgress(progressReporter)
+  } else {
+    go handleNoUIProgress(progressReporter)
+  }
 
   pi := &PackageInstaller{
     backups: make(map[string]string),
@@ -241,3 +243,16 @@ func launchPostInstallExe() {
     log.Println(err)
   }
 }
+
+func handleProgress(pr *ProgressReporter) {
+  go pr.receiveSystemMessages(onSystemMessage)
+  go pr.receiveUpdates(onPercentUpdate)
+  go pr.receiveFinish(onFinished)
+}
+
+func handleNoUIProgress(pr *ProgressReporter) {
+  go pr.receiveSystemMessages(func(msg string) { log.Println(msg) })
+  go pr.receiveUpdates(func(val int) { log.Printf("Done %v%%", val) })
+  go pr.receiveFinish(func() { log.Println("Finished") })
+}
+

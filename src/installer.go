@@ -16,6 +16,7 @@ const (
   CopyPrice = 100
   RenamePrice = 10
 
+  RemoveBackupFactor = 50
   RemoveFactor = RenamePrice
   UpdateFactor = RenamePrice + CopyPrice
   AddFactor = CopyPrice
@@ -81,10 +82,12 @@ func (pi *PackageInstaller) calculateGrandTotals(filesProvider UpdateFilesProvid
 
   for _, fi := range filesProvider.FilesToRemove() {
     sum += uint64(fi.FileSize * RemoveFactor) / 100
+    sum += uint64(RemoveBackupFactor)
   }
 
   for _, fi := range filesProvider.FilesToUpdate() {
     sum += uint64(fi.FileSize * UpdateFactor) / 100
+    sum += uint64(RemoveBackupFactor)
   }
 
   for _, fi := range filesProvider.FilesToAdd() {
@@ -245,6 +248,8 @@ func (pi *PackageInstaller) removeBackups() {
       if err != nil {
         log.Println(err)
       }
+
+      go pi.progressReporter.accountBackupRemove()
     }()
   }
 
@@ -516,6 +521,10 @@ func (pr *ProgressReporter) accountUpdate(progress int64) {
 
 func (pr *ProgressReporter) accountAdd(progress int64) {
   pr.progressChan <- (progress*AddFactor)/100
+}
+
+func (pr *ProgressReporter) accountBackupRemove() {
+  pr.progressChan <- RemoveBackupFactor
 }
 
 func (pr *ProgressReporter) reportingLoop() {

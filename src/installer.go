@@ -193,6 +193,8 @@ func (pi *PackageInstaller) backupFile(relpath string) error {
   backupPath := relpath + ".bak"
 
   newpath := path.Join(pi.installDir, backupPath)
+  // remove previous backup if any
+  os.Remove(newpath)
 
   err := os.Rename(oldpath, newpath)
 

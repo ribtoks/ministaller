@@ -108,15 +108,6 @@ func main() {
     log.Fatal(err)
   }
 
-  backupsDirPath, err := ioutil.TempDir("", appName)
-  if err != nil {
-    log.Fatal(err)
-  }
-
-  backupsDirPath = filepath.ToSlash(backupsDirPath)
-
-  defer os.RemoveAll(backupsDirPath)
-
   progressReporter := &ProgressReporter{
     progressChan: make(chan int64),
     reportingChan: make(chan bool),
@@ -137,7 +128,6 @@ func main() {
     progressReporter: progressReporter,
     installDir: installDirPath,
     packageDir: packageDirPath,
-    backupsDir: backupsDirPath,
     failInTheEnd: *failFlag }
 
   if *showUIFlag {

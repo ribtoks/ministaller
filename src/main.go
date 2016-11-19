@@ -31,6 +31,7 @@ var (
 
 const (
   appName = "ministaller"
+  downloadRetryCount = 3
 )
 
 func main() {
@@ -48,7 +49,7 @@ func main() {
   pathToArchive := *packagePathFlag
 
   if len(*urlFlag) > 0 {
-    localPath, err := downloadFile(*urlFlag)
+    localPath, err := downloadFile(*urlFlag, downloadRetryCount)
     if err != nil {
       log.Fatal(err.Error())
     }
@@ -121,13 +122,14 @@ func main() {
     reportingChan: make(chan bool),
     systemMessageChan: make(chan string),
     finished: make(chan bool),
+    progressHandler: &LogProgressHandler{},
   }
 
   if *showUIFlag {
-    go handleProgress(progressReporter)
-  } else {
-    go handleNoUIProgress(progressReporter)
+    progressReporter.progressHandler = NewUIProgressHandler()
   }
+
+  go progressReporter.handleProgress()
 
   pi := &PackageInstaller{
     backups: make(map[string]string),
@@ -211,7 +213,26 @@ func setupLogging() (f *os.File, err error) {
   return f, err
 }
 
-func downloadFile(remoteAddr string) (filepath string, err error) {
+func downloadFile(remoteAddr string, retryCount int) (string, error) {
+  triesCount := 0
+
+  for {
+    filepath, err := downloadFileOnce(remoteAddr)
+
+    if err != nil {
+      triesCount++
+      if triesCount >= retryCount {
+        return "", nil
+      } else {
+        log.Println("Retrying download...")
+      }
+    } else {
+      return filepath, err
+    }
+  }
+}
+
+func downloadFileOnce(remoteAddr string) (filepath string, err error) {
   log.Printf("Downloading %v", remoteAddr)
 
   tempfile, err := ioutil.TempFile("", appName)
@@ -243,16 +264,3 @@ func launchPostInstallExe() {
     log.Println(err)
   }
 }
-
-func handleProgress(pr *ProgressReporter) {
-  go pr.receiveSystemMessages(onSystemMessage)
-  go pr.receiveUpdates(onPercentUpdate)
-  go pr.receiveFinish(onFinished)
-}
-
-func handleNoUIProgress(pr *ProgressReporter) {
-  go pr.receiveSystemMessages(func(msg string) { log.Println(msg) })
-  go pr.receiveUpdates(func(val int) { log.Printf("Done %v%%", val) })
-  go pr.receiveFinish(func() { log.Println("Finished") })
-}
-

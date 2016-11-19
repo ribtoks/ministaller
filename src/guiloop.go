@@ -10,15 +10,16 @@ var (
   finished = make(chan bool)
 )
 
-func onPercentUpdate(percent int) {
-  log.Printf("Completed %v%%...", percent);
+func NewUIProgressHandler() ProgressHandler {
+  return &UIProgressHandler{}
 }
 
-func onSystemMessage(message string) {
-  log.Println("System message: " + message)
+type UIProgressHandler struct {
+  LogProgressHandler
 }
 
-func onFinished() {
+func (ph *UIProgressHandler) HandleFinish() {
+  log.Printf("Finished")
   finished <- true
 }
 

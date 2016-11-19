@@ -10,19 +10,23 @@ var (
   lb *gform.Label
 )
 
-func onPercentUpdate(percent int) {
-  pb.SetValue(uint32(percent))
-
-  if percent == 100 {
-    gform.Exit()
-  }
+func NewUIProgressHandler() ProgressHandler {
+  return &UIProgressHandler{}
 }
 
-func onSystemMessage(message string) {
+type WinUIProgressHandler struct {
+}
+
+func (ph *WinUIProgressHandler) HandlePercentChange(percent int) {
+  pb.SetValue(uint32(percent))
+}
+
+func (ph *WinUIProgressHandler) HandleSystemMessage(msg string) {
+  log.Printf("System message: %v", msg)
   lb.SetCaption(message)
 }
 
-func onFinished() {
+func (ph *WinUIProgressHandler) HandleFinish() {
   gform.Exit()
 }
 

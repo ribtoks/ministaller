@@ -24,6 +24,15 @@ type BackupPair struct {
   newpath string
 }
 
+type ProgressHandler interface {
+  HandleSystemMessage(message string)
+  HandlePercentChange(percent int)
+  HandleFinish()
+}
+
+type LogProgressHandler struct {
+}
+
 type ProgressReporter struct {
   grandTotal uint64
   currentProgress uint64
@@ -32,6 +41,7 @@ type ProgressReporter struct {
   reportingChan chan bool
   systemMessageChan chan string
   finished chan bool
+  progressHandler ProgressHandler
 }
 
 type PackageInstaller struct {
@@ -532,19 +542,37 @@ func (pr *ProgressReporter) reportingLoop() {
   close(pr.reportingChan)
 }
 
-func (pr *ProgressReporter) receiveUpdates(updateHandler func(value int)) {
+func (pr *ProgressReporter) receiveUpdates() {
   for _ = range pr.reportingChan {
-    updateHandler(pr.percent)
+    pr.progressHandler.HandlePercentChange(pr.percent)
   }
 }
 
-func (pr *ProgressReporter) receiveSystemMessages(messageHandler func(value string)) {
+func (pr *ProgressReporter) receiveSystemMessages() {
   for msg := range pr.systemMessageChan {
-    messageHandler(msg)
+    pr.progressHandler.HandleSystemMessage(msg)
   }
 }
 
-func (pr *ProgressReporter) receiveFinish(handler func()) {
+func (pr *ProgressReporter) receiveFinish() {
   <- pr.finished
-  handler()
+  pr.progressHandler.HandleFinish()
+}
+
+func (pr *ProgressReporter) handleProgress() {
+  go pr.receiveSystemMessages()
+  go pr.receiveUpdates()
+  go pr.receiveFinish()
+}
+
+func (ph *LogProgressHandler) HandlePercentChange(percent int) {
+  log.Printf("Completed %v%%", percent)
+}
+
+func (ph *LogProgressHandler) HandleSystemMessage(msg string) {
+  log.Printf("System message: %v", msg)
+}
+
+func (ph *LogProgressHandler) HandleFinish() {
+  log.Printf("Finished")
 }

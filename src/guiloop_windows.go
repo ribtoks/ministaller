@@ -11,7 +11,7 @@ var (
 )
 
 func NewUIProgressHandler() ProgressHandler {
-  return &UIProgressHandler{}
+  return &WinUIProgressHandler{}
 }
 
 type WinUIProgressHandler struct {
@@ -22,8 +22,7 @@ func (ph *WinUIProgressHandler) HandlePercentChange(percent int) {
 }
 
 func (ph *WinUIProgressHandler) HandleSystemMessage(msg string) {
-  log.Printf("System message: %v", msg)
-  lb.SetCaption(message)
+  lb.SetCaption(msg)
 }
 
 func (ph *WinUIProgressHandler) HandleFinish() {

@@ -140,8 +140,8 @@ func (pi *PackageInstaller) installPackage(filesProvider UpdateFilesProvider) (e
 func (pi *PackageInstaller) afterSuccess() {
   log.Println("After success")
   pi.progressReporter.systemMessageChan <- "Finishing the installation..."
-  cleanupEmptyDirs(pi.installDir)
   pi.removeBackups();
+  cleanupEmptyDirs(pi.installDir)
 }
 
 func (pi *PackageInstaller) afterFailure(filesProvider UpdateFilesProvider) {
@@ -149,8 +149,8 @@ func (pi *PackageInstaller) afterFailure(filesProvider UpdateFilesProvider) {
   pi.progressReporter.systemMessageChan <- "Cleaning up..."
   purgeFiles(pi.installDir, filesProvider.FilesToAdd())
   pi.restoreBackups()
-  cleanupEmptyDirs(pi.installDir)
   pi.removeBackups()
+  cleanupEmptyDirs(pi.installDir)
 }
 
 func copyFile(src, dst string) (err error) {

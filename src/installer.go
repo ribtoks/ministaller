@@ -8,7 +8,6 @@ import (
   "sort"
   "io"
   "io/ioutil"
-  "errors"
   "path/filepath"
 )
 
@@ -59,16 +58,11 @@ type PackageInstaller struct {
 func (pi *PackageInstaller) Install(filesProvider UpdateFilesProvider) error {
   pi.progressReporter.grandTotal = pi.calculateGrandTotals(filesProvider)
   go pi.progressReporter.reportingLoop()
-  defer close(pi.progressReporter.progressChan)
-  defer func() {
-    go func () {
-      pi.progressReporter.finished <- true
-    }()
-  }()
+  defer pi.progressReporter.shutdown()
 
   err := pi.installPackage(filesProvider)
 
-  if err == nil {
+  if (err == nil) && (!pi.failInTheEnd) {
     pi.afterSuccess()
   } else {
     pi.afterFailure(filesProvider)
@@ -132,10 +126,6 @@ func (pi *PackageInstaller) installPackage(filesProvider UpdateFilesProvider) (e
   }()
 
   wg.Wait()
-
-  if pi.failInTheEnd {
-    err = errors.New("Fail by demand")
-  }
 
   return err
 }
@@ -543,6 +533,13 @@ func (pr *ProgressReporter) reportingLoop() {
   }
 
   close(pr.reportingChan)
+}
+
+func (pr *ProgressReporter) shutdown() {
+  close(pr.progressChan)
+  go func () {
+    pr.finished <- true
+  }()
 }
 
 func (pr *ProgressReporter) receiveUpdates() {

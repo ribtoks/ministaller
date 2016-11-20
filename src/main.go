@@ -51,7 +51,7 @@ func main() {
   }
 
   currentExeFullPath = executablePath()
-  log.Printf("Current exe path is", currentExeFullPath)
+  log.Println("Current exe path is", currentExeFullPath)
 
   pathToArchive := *packagePathFlag
 

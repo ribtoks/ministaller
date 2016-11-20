@@ -29,6 +29,10 @@ var (
   showUIFlag = flag.Bool("gui", false, "Show simple progress GUI")
 )
 
+var (
+  currentExeFullPath string
+)
+
 const (
   appName = "ministaller"
   downloadRetryCount = 3
@@ -45,6 +49,9 @@ func main() {
   if err != nil {
     defer logfile.Close()
   }
+
+  currentExeFullPath = executablePath()
+  log.Printf("Current exe path is", currentExeFullPath)
 
   pathToArchive := *packagePathFlag
 

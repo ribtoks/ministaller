@@ -137,6 +137,8 @@ func main() {
     packageDir: packageDirPath,
     failInTheEnd: *failFlag }
 
+  defer pi.removeSelfIfNeeded()
+
   if *showUIFlag {
     go doInstall(pi, df)
     guiloop()

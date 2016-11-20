@@ -9,6 +9,7 @@ import (
   "io"
   "io/ioutil"
   "path/filepath"
+  "os/exec"
 )
 
 const (
@@ -19,6 +20,10 @@ const (
   RemoveFactor = RenamePrice
   UpdateFactor = RenamePrice + CopyPrice
   AddFactor = CopyPrice
+)
+
+const (
+  BackupExt = ".bak"
 )
 
 type BackupPair struct {
@@ -52,6 +57,7 @@ type PackageInstaller struct {
   progressReporter *ProgressReporter
   installDir string
   packageDir string
+  removeSelfPath string // if updating the installer
   failInTheEnd bool // for debugging purposes
 }
 
@@ -59,6 +65,8 @@ func (pi *PackageInstaller) Install(filesProvider UpdateFilesProvider) error {
   pi.progressReporter.grandTotal = pi.calculateGrandTotals(filesProvider)
   go pi.progressReporter.reportingLoop()
   defer pi.progressReporter.shutdown()
+
+  pi.beforeInstall()
 
   err := pi.installPackage(filesProvider)
 
@@ -89,6 +97,10 @@ func (pi *PackageInstaller) calculateGrandTotals(filesProvider UpdateFilesProvid
   }
 
   return sum
+}
+
+func (pi *PackageInstaller) beforeInstall() {
+  pi.removeOldBackups()
 }
 
 func (pi *PackageInstaller) installPackage(filesProvider UpdateFilesProvider) (err error) {
@@ -180,7 +192,7 @@ func (pi *PackageInstaller) backupFile(relpath string) error {
   log.Printf("Backing up %v", relpath)
 
   oldpath := path.Join(pi.installDir, relpath)
-  backupPath := relpath + ".bak"
+  backupPath := relpath + BackupExt
 
   newpath := path.Join(pi.installDir, backupPath)
   // remove previous backup if any
@@ -223,8 +235,28 @@ func (pi *PackageInstaller) restoreBackups() {
   wg.Wait()
 }
 
+func (pi *PackageInstaller) removeOldBackups() {
+  backeduppath := currentExeFullPath + BackupExt
+  err := os.Remove(backeduppath)
+  if err == nil {
+    log.Println("Old installer backup removed", backeduppath)
+  } else if os.IsNotExist(err) {
+    log.Println("Old installer backup was not found")
+  } else {
+    log.Println(err)
+  }
+}
+
 func (pi *PackageInstaller) removeBackups() {
   log.Printf("Removing %v backups", len(pi.backups))
+
+  selfpath, err := filepath.Rel(pi.installDir, currentExeFullPath)
+  if err == nil {
+    if backuppath, ok := pi.backups[selfpath]; ok {
+      pi.removeSelfPath = backuppath
+      delete(pi.backups, selfpath)
+    }
+  }
 
   var wg sync.WaitGroup
 
@@ -398,6 +430,21 @@ func (pi *PackageInstaller) addFiles(files []*UpdateFileInfo) error {
   }
 
   return nil
+}
+
+func (pi *PackageInstaller) removeSelfIfNeeded() {
+  if pi.removeSelfPath == "" {
+    log.Println("No need to remove itself")
+    return
+  }
+
+  pathToRemove := filepath.FromSlash(pi.removeSelfPath)
+  log.Println("Removing the exe", pathToRemove)
+  cmd := exec.Command("cmd.exe", "ping 127.0.0.1 -n 5 > nul & del \"" + pathToRemove + "\"")
+  err := cmd.Start()
+  if err != nil {
+    log.Println(err)
+  }
 }
 
 func purgeFiles(root string, files []*UpdateFileInfo) {

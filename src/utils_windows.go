@@ -34,5 +34,5 @@ func executablePath() string {
     exepath, _ = exec.LookPath(os.Args[0])
   }
 
-  return filepath.ToSlash(execpath)
+  return filepath.ToSlash(exepath)
 }

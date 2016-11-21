@@ -140,6 +140,7 @@ func main() {
   defer pi.removeSelfIfNeeded()
 
   if *showUIFlag {
+    guiinit()
     go doInstall(pi, df)
     guiloop()
   } else {

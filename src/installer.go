@@ -439,8 +439,8 @@ func (pi *PackageInstaller) removeSelfIfNeeded() {
   }
 
   pathToRemove := filepath.FromSlash(pi.removeSelfPath)
-  log.Println("Removing the exe", pathToRemove)
-  cmd := exec.Command("cmd.exe", "ping 127.0.0.1 -n 5 > nul & del \"" + pathToRemove + "\"")
+  log.Println("Removing exe backup", pathToRemove)
+  cmd := exec.Command("cmd.exe", "ping 127.0.0.1 -n 4 > null & del \"" + pathToRemove + "\"")
   err := cmd.Start()
   if err != nil {
     log.Println(err)
@@ -563,28 +563,37 @@ func (pr *ProgressReporter) accountAdd(progress int64) {
 }
 
 func (pr *ProgressReporter) accountBackupRemove() {
-  // ability to know precise size incomplicates this
+  // exact size of files is not known when removeBackups()
+  // so using some arbitrary value (fair dice roll)
   pr.progressChan <- RemoveBackupPrice
 }
 
 func (pr *ProgressReporter) reportingLoop() {
+  var wg sync.WaitGroup
+  
   for chunk := range pr.progressChan {
     pr.currentProgress += uint64(chunk)
 
     percent := (pr.currentProgress*100) / pr.grandTotal
     pr.percent = int(percent)
 
+    wg.Add(1)
     go func() {
       pr.reportingChan <- true
+      wg.Done()
     }()
   }
 
-  close(pr.reportingChan)
+  go func() {
+    wg.Wait()
+    close(pr.reportingChan)
+  }()
 }
 
 func (pr *ProgressReporter) shutdown() {
+  log.Println("Shutting down progress reporter...")
   close(pr.progressChan)
-  go func () {
+  go func() {
     pr.finished <- true
   }()
 }

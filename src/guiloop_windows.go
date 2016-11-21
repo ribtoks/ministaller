@@ -6,7 +6,9 @@ import (
 )
 
 var (
-  pb  *gform.ProgressBar
+  guifinished chan bool
+  mw *gform.Form
+  pb *gform.ProgressBar
   lb *gform.Label
 )
 
@@ -26,13 +28,14 @@ func (ph *WinUIProgressHandler) HandleSystemMessage(msg string) {
 }
 
 func (ph *WinUIProgressHandler) HandleFinish() {
+  guifinished <- true
   gform.Exit()
 }
 
-func guiloop() {
+func guiinit() {
   gform.Init()
 
-  mw := gform.NewForm(nil)
+  mw = gform.NewForm(nil)
   mw.SetSize(360, 125)
   mw.SetCaption("ministaller")
   mw.EnableMaxButton(false)
@@ -52,6 +55,13 @@ func guiloop() {
 
   mw.Show()
   mw.Center()
+}
 
-  gform.RunMainLoop()
+func guiloop() {
+  go gform.RunMainLoop()
+  <- guifinished
+}
+
+func init() {
+  guifinished = make(chan bool)
 }

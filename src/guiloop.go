@@ -23,6 +23,10 @@ func (ph *UIProgressHandler) HandleFinish() {
   finished <- true
 }
 
+func guiinit() {
+  // do nothing
+}
+
 func guiloop() {
   <- finished
 }

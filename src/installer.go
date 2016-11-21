@@ -440,7 +440,7 @@ func (pi *PackageInstaller) removeSelfIfNeeded() {
 
   pathToRemove := filepath.FromSlash(pi.removeSelfPath)
   log.Println("Removing exe backup", pathToRemove)
-  cmd := exec.Command("cmd.exe", "ping 127.0.0.1 -n 4 > null & del \"" + pathToRemove + "\"")
+  cmd := exec.Command("cmd", "/C", "ping localhost -n 2 -w 5000 > nul & del", pathToRemove)
   err := cmd.Start()
   if err != nil {
     log.Println(err)

@@ -42,9 +42,9 @@ Command line switches:
     -gui
         Show simple progress GUI (works only for Windows at this time)
     -l string
-        absolute path to the log file (default "ministaller.log")
+        Absolute path to the log file (default "ministaller.log")
     -launch-exe string
-        relative path to the exe to launch after install
+        Relative path to the exe to launch after install
     -stdout
         Log to stdout and to logfile
     -url string
@@ -74,4 +74,4 @@ This code worked for me with paths with non-latin and Unicode symbols in Windows
     
 ## Disclaimer
 
-Theoretically such an application is useless for full update on other platforms except Windows, because OS X has _dmg_ packages which can simply override previous contents (and Sparkle framework otherwise) and updates in Linux and many other \*nix systems are propagated through repositories.
+Theoretically such an application is useless for full update on other platforms but Windows, because OS X has _dmg_ packages which can simply override previous contents (and Sparkle framework otherwise) and updates in Linux and many other \*nix systems are propagated through repositories (or ports).

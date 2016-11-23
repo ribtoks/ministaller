@@ -14,6 +14,8 @@ It compiles to a fully standalone executable which can be distributed along with
 ### General instructions
 
     go get github.com/Ribtoks/gform
+    git clone https://github.com/Ribtoks/ministaller.git
+    cd ministaller/src
     go build -o ministaller.exe -ldflags="-H windowsgui"
     
 Check out the `appveyor.yml` file for detailed build instructions.
@@ -55,7 +57,7 @@ Command line switches:
 Sample usage from Qt application is:
 
     const QString appDirPath = QCoreApplication::applicationDirPath();
-    QDir appDir(dirPathPath);
+    QDir appDir(appDirPath);
     
     QDir documentsDir(QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation));
     const QString logFilePath = documentsDir.filePath("ministaller.log");

@@ -114,6 +114,10 @@ func (pi *PackageInstaller) installPackage(filesProvider UpdateFilesProvider) (e
     }
     wg.Done()
   }()
+  
+  defer func() {
+    close(pi.backupsChan)
+  }()
 
   pi.progressReporter.systemMessageChan <- "Removing components"
   err = pi.removeFiles(filesProvider.FilesToRemove())
@@ -132,10 +136,6 @@ func (pi *PackageInstaller) installPackage(filesProvider UpdateFilesProvider) (e
   if err != nil {
     return err
   }
-
-  go func() {
-    close(pi.backupsChan)
-  }()
 
   wg.Wait()
 
@@ -230,6 +230,7 @@ func (pi *PackageInstaller) restoreBackups() {
       defer wg.Done()
 
       oldpath := path.Join(pi.installDir, relativePath)
+      log.Printf("Restoring %v to %v", pathToRestore, oldpath)
       err := os.Rename(pathToRestore, oldpath)
 
       if err != nil {
@@ -249,7 +250,7 @@ func (pi *PackageInstaller) removeOldBackups() {
   } else if os.IsNotExist(err) {
     log.Println("Old installer backup was not found")
   } else {
-    log.Println(err)
+    log.Printf("Error while removing old backup: %v", err)
   }
 }
 
@@ -413,6 +414,8 @@ func (pi *PackageInstaller) addFiles(files []*UpdateFileInfo) error {
 
       newpath := path.Join(pi.packageDir, pathToAdd)
       err := os.Rename(newpath, oldpath)
+      
+      log.Printf("Adding file %v", pathToAdd)
 
       if err != nil {
         log.Printf("Adding file %v failed", pathToAdd)
@@ -439,7 +442,7 @@ func (pi *PackageInstaller) addFiles(files []*UpdateFileInfo) error {
 }
 
 func (pi *PackageInstaller) removeSelfIfNeeded() {
-  if pi.removeSelfPath == "" {
+  if len(pi.removeSelfPath) == 0 {
     log.Println("No need to remove itself")
     return
   }
@@ -469,7 +472,7 @@ func purgeFiles(root string, files []*UpdateFileInfo) {
       fullpath := path.Join(root, fileToPurge)
       err := os.Remove(fullpath)
       if err != nil {
-        log.Println(err)
+        log.Printf("Error while removing %v: %v", fullpath, err)
       }
     }()
   }
@@ -500,41 +503,24 @@ func (s ByLength) Less(i, j int) bool {
 }
 
 func cleanupEmptyDirs(root string) {
-  c := make(chan string)
+  dirs := make([]string, 0, 10)
 
-  go func() {
-    var wg sync.WaitGroup
-    err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
-      if err != nil {
-        return err
-      }
-
-      if info.Mode().IsDir() {
-        wg.Add(1)
-        go func() {
-          c <- path
-          wg.Done()
-        }()
-      }
-
-      return nil
-    })
-
+  err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
     if err != nil {
-      log.Println(err)
+      return err
     }
 
-    go func() {
-      wg.Wait()
-      close(c)
-    }()
-  }()
+    if info.Mode().IsDir() {  
+      dirs = append(dirs, path)
+    }
+    
+    return nil
+  })
 
-  dirs := make([]string, 0)
-  for path := range c {
-    dirs = append(dirs, path)
+  if err != nil {
+    log.Printf("Error while cleaning up empty dirs: %v", err)
   }
-
+  
   removeEmptyDirs(dirs)
 }
 

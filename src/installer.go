@@ -116,10 +116,11 @@ func (pi *PackageInstaller) installPackage(filesProvider UpdateFilesProvider) (e
       pi.backupsWG.Done()
     }
     
-    log.Println("Backups accounting finished")
+    log.Printf("Backups accounting finished. %v backups available", len(pi.backups))
   }()
   
   defer func() {
+    log.Println("Stopping backups accounting routine...")
     close(pi.backupsChan)
   }()
 
@@ -231,10 +232,7 @@ func (pi *PackageInstaller) restoreBackups() {
   for relpath, backuppath := range pi.backups {
     wg.Add(1)
 
-    relativePath := relpath
-    pathToRestore := backuppath
-
-    go func() {
+    go func(relativePath, pathToRestore string) {
       defer wg.Done()
 
       oldpath := path.Join(pi.installDir, relativePath)
@@ -242,9 +240,9 @@ func (pi *PackageInstaller) restoreBackups() {
       err := os.Rename(pathToRestore, oldpath)
 
       if err != nil {
-        log.Println(err)
+        log.Printf("Error while restoring %v: %v", pathToRestore, err)
       }
-    }()
+    }(relpath, backuppath)
   }
 
   wg.Wait()
@@ -270,6 +268,7 @@ func (pi *PackageInstaller) removeBackups() {
     if backuppath, ok := pi.backups[selfpath]; ok {
       pi.removeSelfPath = backuppath
       delete(pi.backups, selfpath)
+      log.Printf("Removed exe path %v from backups", selfpath)
     }
   }
 
@@ -278,18 +277,16 @@ func (pi *PackageInstaller) removeBackups() {
   for _, backuppath := range pi.backups {
     wg.Add(1)
 
-    pathToRemove := backuppath
-
-    go func() {
+    go func(pathToRemove string) {
       defer wg.Done()
 
       err := os.Remove(pathToRemove)
       if err != nil {
-        log.Println(err)
+        log.Printf("Error while removing %v: %v", pathToRemove err)
       }
 
       pi.progressReporter.accountBackupRemove()
-    }()
+    }(backuppath)
   }
 
   wg.Wait()
@@ -320,8 +317,7 @@ func (pi *PackageInstaller) removeFiles(files []*UpdateFileInfo) error {
       err := pi.backupFile(pathToRemove)
 
       if err != nil {
-        log.Printf("Removing file %v failed", pathToRemove)
-        log.Println(err)
+        log.Printf("Removing file %v failed: %v", pathToRemove, err)
         errc <- err
         close(done)
       } else {
@@ -426,8 +422,7 @@ func (pi *PackageInstaller) addFiles(files []*UpdateFileInfo) error {
       log.Printf("Adding file %v", pathToAdd)
 
       if err != nil {
-        log.Printf("Adding file %v failed", pathToAdd)
-        log.Println(err)
+        log.Printf("Adding file %v failed: %v", pathToAdd, err)
         errc <- err
         close(done)
       } else {
@@ -455,6 +450,7 @@ func (pi *PackageInstaller) removeSelfIfNeeded() {
     return
   }
 
+  // TODO: move this to windows-only define
   pathToRemove := filepath.FromSlash(pi.removeSelfPath)
   log.Println("Removing exe backup", pathToRemove)
   cmd := exec.Command("cmd", "/C", "ping localhost -n 2 -w 5000 > nul & del", pathToRemove)
@@ -472,17 +468,15 @@ func purgeFiles(root string, files []*UpdateFileInfo) {
   for _, fi := range files {
     wg.Add(1)
 
-    fileToPurge := fi.Filepath
-
-    go func() {
+    go func(fileToPurge string) {
       defer wg.Done()
 
       fullpath := path.Join(root, fileToPurge)
       err := os.Remove(fullpath)
       if err != nil {
-        log.Printf("Error while removing %v: %v", fullpath, err)
+        log.Printf("Error while purgin %v: %v", fullpath, err)
       }
-    }()
+    }(fi.Filepath)
   }
 
   wg.Wait()
@@ -544,7 +538,7 @@ func removeEmptyDirs(dirs []string) {
 
       err = os.Remove(dirpath)
       if err != nil {
-        log.Println(err)
+        log.Printf("Error while removing dir %v: %v", dirpath, err)
       }
     }
   }
@@ -590,6 +584,8 @@ func (pr *ProgressReporter) reportingLoop() {
     pr.progressHandler.HandlePercentChange(pr.percent)
     pr.progressWG.Done()
   }
+  
+  log.Println("Reporting loop finished")
 }
 
 func (pr *ProgressReporter) waitProgressReported() {

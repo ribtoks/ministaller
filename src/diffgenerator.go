@@ -50,7 +50,7 @@ func (df DiffGenerator) FilesToRemove() []*UpdateFileInfo {
 func (df *DiffGenerator) GenerateDiffs() error {
   err := df.calculateHashes()
   if err != nil {
-    return err
+    log.Fatal(err)
   }
 
   var wg sync.WaitGroup
@@ -85,41 +85,32 @@ func (df *DiffGenerator) GenerateDiffs() error {
     wg.Done()
   }()
 
-  go df.generateDirectoryDiff(df.installDirPath, df.packageDirPath)
-  go func() {
-    wg.Wait()
-    df.errors <- nil
-  }()
+  df.generateDirectoryDiff(df.installDirPath, df.packageDirPath)
 
-  if err := <- df.errors; err != nil {
-    return err
-  }
+  wg.Wait()
+  log.Println("Differences generated")
 
-  return nil
+  return err
 }
 
 func (df *DiffGenerator) calculateHashes() error {
   log.Println("Calculating hashes...")
+  var wg sync.WaitGroup
 
-  ierrc := make(chan error, 1)
-  perrc := make(chan error, 1)
-
+  wg.Add(1)
   go func() {
-    var err error
-    df.installDirHashes, err = CalculateHashes(df.installDirPath)
-    ierrc <- err
+    df.installDirHashes = CalculateHashes(df.installDirPath)
+    wg.Done()
   }()
 
+  wg.Add(1)
   go func() {
-    var err error
-    df.packageDirHashes, err = CalculateHashes(df.packageDirPath)
-    perrc <- err
+    df.packageDirHashes = CalculateHashes(df.packageDirPath)
+    wg.Done()
   }()
 
-  defer log.Println("Hashes calculated")
-
-  if err := <- ierrc; err != nil { return err }
-  if err := <- perrc; err != nil { return err }
+  wg.Wait()
+  log.Println("Hashes calculated")
 
   return nil
 }
@@ -146,6 +137,8 @@ func (df *DiffGenerator) findFilesToRemoveOrUpdate(installDir, packageDir string
     wg.Add(1)
 
     go func() {
+      defer wg.Done()
+
       relativePath, err := filepath.Rel(df.installDirPath, path)
       if err != nil { log.Fatal(err) }
       relativePath = filepath.ToSlash(relativePath)
@@ -170,22 +163,18 @@ func (df *DiffGenerator) findFilesToRemoveOrUpdate(installDir, packageDir string
           df.filesToUpdateQueue <- ufi
         }
       }
-
-      wg.Done()
     }()
 
     return nil
   })
 
-  go func() {
-    wg.Wait()
-    close(df.filesToRemoveQueue)
-    close(df.filesToUpdateQueue)
-  }()
-
   if err != nil {
-    df.errors <- err
+    log.Printf("Error while update/remove generation: %v", err)
   }
+
+  wg.Wait()
+  close(df.filesToRemoveQueue)
+  close(df.filesToUpdateQueue)
 }
 
 func (df *DiffGenerator) findFilesToAdd(installDir, packageDir string) {
@@ -202,6 +191,8 @@ func (df *DiffGenerator) findFilesToAdd(installDir, packageDir string) {
     wg.Add(1)
 
     go func() {
+      defer wg.Done()
+
       relativePath, err := filepath.Rel(df.packageDirPath, path)
       if err != nil { log.Fatal(err) }
       relativePath = filepath.ToSlash(relativePath)
@@ -224,12 +215,10 @@ func (df *DiffGenerator) findFilesToAdd(installDir, packageDir string) {
     return nil
   })
 
-  go func() {
-    wg.Wait()
-    close(df.filesToAddQueue)
-  }()
-
   if err != nil {
-    df.errors <- err
+    log.Printf("Error while add generation: %v", err)
   }
+
+  wg.Wait()
+  close(df.filesToAddQueue)
 }

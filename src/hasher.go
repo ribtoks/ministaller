@@ -16,7 +16,7 @@ type HashResult struct {
   err error
 }
 
-func CalculateHashes(root string) (map[string]string, error) {
+func CalculateHashes(root string) map[string]string {
   var wg sync.WaitGroup
   c := make(chan HashResult)
 
@@ -43,7 +43,7 @@ func CalculateHashes(root string) (map[string]string, error) {
 
   log.Printf("Hashes accounting finished")
 
-  return m, nil
+  return m
 }
 
 func calculateSha1Hashes(root string, wg *sync.WaitGroup, c chan HashResult) {

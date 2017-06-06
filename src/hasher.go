@@ -7,6 +7,7 @@ import (
   "encoding/hex"
   "path/filepath"
   "sync"
+  "log"
 )
 
 type HashResult struct {
@@ -16,66 +17,61 @@ type HashResult struct {
 }
 
 func CalculateHashes(root string) (map[string]string, error) {
-  c, errc := calculateSha1Hashes(root)
+  var wg sync.WaitGroup
+  c := make(chan HashResult)
+
+  go calculateSha1Hashes(root, &wg, c)
 
   m := make(map[string]string)
+
   for r := range c {
+    wg.Done()
+
     if r.err != nil {
-      return nil, r.err
+      log.Printf("Error while calculating hash: %v", r.err)
+      continue
     }
 
     key, err := filepath.Rel(root, r.path)
     if err != nil {
-      return nil, err
+      log.Printf("Error while calculating relative path: %v", err)
     } else {
       key = filepath.ToSlash(key)
       m[key] = r.hash
     }
   }
 
-  if err := <- errc; err != nil {
-    return nil, err
-  }
+  log.Printf("Hashes accounting finished")
 
   return m, nil
 }
 
-func calculateSha1Hashes(root string) (<-chan HashResult, <-chan error) {
-  c := make(chan HashResult)
-  errc := make(chan error, 1)
+func calculateSha1Hashes(root string, wg *sync.WaitGroup, c chan HashResult) {
+  err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
+    if err != nil {
+      return err
+    }
 
-  go func() {
-    var wg sync.WaitGroup
-    err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
-      if err != nil {
-        return err
-      }
-
-      if !info.Mode().IsRegular() {
-        return nil
-      }
-
-      wg.Add(1)
-
-      go func() {
-        hash, err := calculateFileHash(path)
-        c <- HashResult{path, hash, err}
-
-        wg.Done()
-      }()
-
+    if !info.Mode().IsRegular() {
       return nil
-    })
+    }
+
+    wg.Add(1)
 
     go func() {
-      wg.Wait()
-      close(c)
+      hash, err := calculateFileHash(path)
+      c <- HashResult{path, hash, err}
     }()
 
-    errc <- err
-  }()
+    return nil
+  })
 
-  return c, errc
+  if err != nil { log.Printf("Error while hashing: %v", err) }
+
+  wg.Wait()
+  close(c)
+
+  log.Println("Hashing generation finished")
 }
 
 func calculateFileHash(filepath string) (string, error) {

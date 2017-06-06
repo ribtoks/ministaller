@@ -117,7 +117,6 @@ func main() {
 
   progressReporter := &ProgressReporter{
     progressChan: make(chan int64),
-    reportingChan: make(chan bool),
     systemMessageChan: make(chan string),
     finished: make(chan bool),
     progressHandler: &LogProgressHandler{},

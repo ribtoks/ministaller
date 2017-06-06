@@ -208,8 +208,6 @@ func (df *DiffGenerator) findFilesToAdd(installDir, packageDir string) {
           FileSize: efi.Size(),
         }
       }
-
-      wg.Done()
     }()
 
     return nil

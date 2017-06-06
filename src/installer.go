@@ -77,8 +77,7 @@ func (pi *PackageInstaller) Install(filesProvider UpdateFilesProvider) error {
     pi.afterFailure(filesProvider)
   }
   
-  pi.progressReporter.waitProgressReported()
-  pi.progressReporter.shutdown()
+  pi.teardown()
 
   return err
 }
@@ -162,6 +161,14 @@ func (pi *PackageInstaller) afterFailure(filesProvider UpdateFilesProvider) {
   pi.restoreBackups()
   pi.removeBackups()
   cleanupEmptyDirs(pi.installDir)
+}
+
+func (pi *PackageInstaller) teardown() {
+  log.Println("Teardown stage!")
+  
+  pi.progressReporter.waitProgressReported()
+  pi.progressReporter.shutdown()
+  pi.progressReporter.receiveFinish()
 }
 
 func copyFile(src, dst string) (err error) {
@@ -605,16 +612,18 @@ func (pr *ProgressReporter) receiveSystemMessages() {
   for msg := range pr.systemMessageChan {
     pr.progressHandler.HandleSystemMessage(msg)
   }
+  
+  log.Println("System messages handling finished")
 }
 
 func (pr *ProgressReporter) receiveFinish() {
+  log.Println("Waiting for teardown and global finish...")
   <- pr.finished
   pr.progressHandler.HandleFinish()
 }
 
 func (pr *ProgressReporter) handleProgress() {
   go pr.receiveSystemMessages()
-  go pr.receiveFinish()
 }
 
 func (ph *LogProgressHandler) HandlePercentChange(percent int) {
@@ -626,5 +635,5 @@ func (ph *LogProgressHandler) HandleSystemMessage(msg string) {
 }
 
 func (ph *LogProgressHandler) HandleFinish() {
-  log.Printf("Finished")
+  log.Println("Finished")
 }

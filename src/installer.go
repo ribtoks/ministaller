@@ -43,9 +43,9 @@ type LogProgressHandler struct {
 type ProgressReporter struct {
   grandTotal uint64
   currentProgress uint64
-  progressChan chan int64
+  progressChan chan int64  
+  progressWG sync.WaitGroup
   percent int //0..100
-  reportingChan chan bool
   systemMessageChan chan string
   finished chan bool
   progressHandler ProgressHandler
@@ -64,8 +64,8 @@ type PackageInstaller struct {
 
 func (pi *PackageInstaller) Install(filesProvider UpdateFilesProvider) error {
   pi.progressReporter.grandTotal = pi.calculateGrandTotals(filesProvider)
+  
   go pi.progressReporter.reportingLoop()
-  defer pi.progressReporter.shutdown()
 
   pi.beforeInstall()
 
@@ -76,6 +76,9 @@ func (pi *PackageInstaller) Install(filesProvider UpdateFilesProvider) error {
   } else {
     pi.afterFailure(filesProvider)
   }
+  
+  pi.progressReporter.waitProgressReported()
+  pi.progressReporter.shutdown()
 
   return err
 }
@@ -138,6 +141,7 @@ func (pi *PackageInstaller) installPackage(filesProvider UpdateFilesProvider) (e
     return err
   }
 
+  log.Println("Waiting for backups to finish accounting...")
   pi.backupsWG.Wait()
 
   return err
@@ -284,7 +288,7 @@ func (pi *PackageInstaller) removeBackups() {
         log.Println(err)
       }
 
-      go pi.progressReporter.accountBackupRemove()
+      pi.progressReporter.accountBackupRemove()
     }()
   }
 
@@ -321,7 +325,7 @@ func (pi *PackageInstaller) removeFiles(files []*UpdateFileInfo) error {
         errc <- err
         close(done)
       } else {
-        go pi.progressReporter.accountRemove(filesize)
+        pi.progressReporter.accountRemove(filesize)
       }
     }()
   }
@@ -375,7 +379,7 @@ func (pi *PackageInstaller) updateFiles(files []*UpdateFileInfo) error {
         errc <- err
         close(done)
       } else {
-        go pi.progressReporter.accountUpdate(filesize)
+        pi.progressReporter.accountUpdate(filesize)
       }
     }()
   }
@@ -427,7 +431,7 @@ func (pi *PackageInstaller) addFiles(files []*UpdateFileInfo) error {
         errc <- err
         close(done)
       } else {
-        go pi.progressReporter.accountAdd(filesize)
+        pi.progressReporter.accountAdd(filesize)
       }
     }()
   }
@@ -547,43 +551,50 @@ func removeEmptyDirs(dirs []string) {
 }
 
 func (pr *ProgressReporter) accountRemove(progress int64) {
-  pr.progressChan <- (progress*RemoveFactor)/100
+  pr.progressWG.Add(1)
+  go func() {
+    pr.progressChan <- (progress*RemoveFactor)/100
+  }()
 }
 
 func (pr *ProgressReporter) accountUpdate(progress int64) {
-  pr.progressChan <- (progress*UpdateFactor)/100
+  pr.progressWG.Add(1)
+  go func() {
+    pr.progressChan <- (progress*UpdateFactor)/100
+  }()
 }
 
 func (pr *ProgressReporter) accountAdd(progress int64) {
-  pr.progressChan <- (progress*AddFactor)/100
+  pr.progressWG.Add(1)
+  go func() {
+    pr.progressChan <- (progress*AddFactor)/100
+  }()
 }
 
 func (pr *ProgressReporter) accountBackupRemove() {
   // exact size of files is not known when removeBackups()
   // so using some arbitrary value (fair dice roll)
-  pr.progressChan <- RemoveBackupPrice
+  pr.progressWG.Add(1)
+  go func() {
+    pr.progressChan <- RemoveBackupPrice
+  }()
 }
 
 func (pr *ProgressReporter) reportingLoop() {
-  var wg sync.WaitGroup
-  
   for chunk := range pr.progressChan {
     pr.currentProgress += uint64(chunk)
 
     percent := (pr.currentProgress*100) / pr.grandTotal
     pr.percent = int(percent)
-
-    wg.Add(1)
-    go func() {
-      pr.reportingChan <- true
-      wg.Done()
-    }()
+      
+    pr.progressHandler.HandlePercentChange(pr.percent)
+    pr.progressWG.Done()
   }
+}
 
-  go func() {
-    wg.Wait()
-    close(pr.reportingChan)
-  }()
+func (pr *ProgressReporter) waitProgressReported() {
+  log.Println("Waiting for progress reporting to finish")
+  pr.progressWG.Wait()
 }
 
 func (pr *ProgressReporter) shutdown() {
@@ -592,12 +603,6 @@ func (pr *ProgressReporter) shutdown() {
   go func() {
     pr.finished <- true
   }()
-}
-
-func (pr *ProgressReporter) receiveUpdates() {
-  for _ = range pr.reportingChan {
-    pr.progressHandler.HandlePercentChange(pr.percent)
-  }
 }
 
 func (pr *ProgressReporter) receiveSystemMessages() {
@@ -613,7 +618,6 @@ func (pr *ProgressReporter) receiveFinish() {
 
 func (pr *ProgressReporter) handleProgress() {
   go pr.receiveSystemMessages()
-  go pr.receiveUpdates()
   go pr.receiveFinish()
 }
 

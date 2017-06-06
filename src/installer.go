@@ -54,6 +54,7 @@ type ProgressReporter struct {
 type PackageInstaller struct {
   backups map[string]string
   backupsChan chan BackupPair
+  backupsWG sync.WaitGroup
   progressReporter *ProgressReporter
   installDir string
   packageDir string
@@ -106,13 +107,13 @@ func (pi *PackageInstaller) beforeInstall() {
 func (pi *PackageInstaller) installPackage(filesProvider UpdateFilesProvider) (err error) {
   log.Println("Installing package...")
 
-  var wg sync.WaitGroup
-  wg.Add(1)
   go func() {
     for bp := range pi.backupsChan {
       pi.backups[bp.relpath] = bp.newpath
+      pi.backupsWG.Done()
     }
-    wg.Done()
+    
+    log.Println("Backups accounting finished")
   }()
   
   defer func() {
@@ -137,7 +138,7 @@ func (pi *PackageInstaller) installPackage(filesProvider UpdateFilesProvider) (e
     return err
   }
 
-  wg.Wait()
+  pi.backupsWG.Wait()
 
   return err
 }
@@ -207,7 +208,10 @@ func (pi *PackageInstaller) backupFile(relpath string) error {
   err := os.Rename(oldpath, newpath)
 
   if err == nil {
-    pi.backupsChan <- BackupPair{relpath: relpath, newpath: newpath}
+    pi.backupsWG.Add(1)
+    go func() {
+      pi.backupsChan <- BackupPair{relpath: relpath, newpath: newpath}
+    }()
   } else {
     log.Printf("Backup failed: %v", err)
   }

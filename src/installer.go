@@ -282,7 +282,7 @@ func (pi *PackageInstaller) removeBackups() {
 
       err := os.Remove(pathToRemove)
       if err != nil {
-        log.Printf("Error while removing %v: %v", pathToRemove err)
+        log.Printf("Error while removing %v: %v", pathToRemove, err)
       }
 
       pi.progressReporter.accountBackupRemove()
@@ -474,7 +474,7 @@ func purgeFiles(root string, files []*UpdateFileInfo) {
       fullpath := path.Join(root, fileToPurge)
       err := os.Remove(fullpath)
       if err != nil {
-        log.Printf("Error while purgin %v: %v", fullpath, err)
+        log.Printf("Error while purging %v: %v", fullpath, err)
       }
     }(fi.Filepath)
   }

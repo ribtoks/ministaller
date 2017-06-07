@@ -199,12 +199,19 @@ func parseFlags() error {
 }
 
 func setupLogging() (f *os.File, err error) {
-  log.SetOutput(&lumberjack.Logger{
+  lgl := &lumberjack.Logger{
     Filename:   *logPathFlag,
     MaxSize:    10, // megabytes
     MaxBackups: 3,
     MaxAge:     28, //days
-  })
+  }
+
+  if *stdoutFlag {
+    mw := io.MultiWriter(os.Stdout, lgl)
+    log.SetOutput(mw)
+  } else {
+    log.SetOutput(lgl)
+  }
   
   log.Println("------------------------------")
   log.Println("Ministaller log started")

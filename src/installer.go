@@ -373,7 +373,8 @@ func (pi *PackageInstaller) updateFiles(files []*UpdateFileInfo) error {
 
       if err == nil {
         newpath := path.Join(pi.packageDir, pathToUpdate)
-        err = os.Rename(newpath, oldpath)
+        os.Remove(oldpath)
+        err = copyFile(newpath, oldpath)
       }
 
       if err != nil {
@@ -424,7 +425,7 @@ func (pi *PackageInstaller) addFiles(files []*UpdateFileInfo) error {
       ensureDirExists(oldpath)
 
       newpath := path.Join(pi.packageDir, pathToAdd)
-      err := os.Rename(newpath, oldpath)
+      err := copyFile(newpath, oldpath)
       
       log.Printf("Adding file %v", pathToAdd)
 

@@ -4,19 +4,19 @@ import (
   "path"
   "os"
   "sync"
-  "log"
   "sort"
   "io"
   "io/ioutil"
   "path/filepath"
   "os/exec"
+  "log"
 )
 
 const (
   CopyPrice = 100
-  RenamePrice = 10
+  RenamePrice = CopyPrice
 
-  RemoveBackupPrice = 1000
+  RemoveBackupPrice = 10
   RemoveFactor = RenamePrice
   UpdateFactor = RenamePrice + CopyPrice
   AddFactor = CopyPrice
@@ -29,6 +29,10 @@ const (
 type BackupPair struct {
   relpath string
   newpath string
+}
+
+type CopyRequest struct {
+  from, to string
 }
 
 type ProgressHandler interface {
@@ -63,6 +67,13 @@ type PackageInstaller struct {
 }
 
 func (pi *PackageInstaller) Install(filesProvider UpdateFilesProvider) error {
+  defer func() {
+    if r := recover(); r != nil {
+      log.Printf("Recovered in install... %v", r)
+      pi.afterFailure(filesProvider)
+    }
+  }()
+  
   pi.progressReporter.grandTotal = pi.calculateGrandTotals(filesProvider)
   
   go pi.progressReporter.reportingLoop()
@@ -87,12 +98,12 @@ func (pi *PackageInstaller) calculateGrandTotals(filesProvider UpdateFilesProvid
 
   for _, fi := range filesProvider.FilesToRemove() {
     sum += uint64(fi.FileSize * RemoveFactor) / 100
-    sum += uint64(RemoveBackupPrice)
+    sum += uint64(fi.FileSize * RemoveBackupPrice) / 100
   }
 
   for _, fi := range filesProvider.FilesToUpdate() {
     sum += uint64(fi.FileSize * UpdateFactor) / 100
-    sum += uint64(RemoveBackupPrice)
+    sum += uint64(fi.FileSize * RemoveBackupPrice) / 100
   }
 
   for _, fi := range filesProvider.FilesToAdd() {
@@ -109,33 +120,25 @@ func (pi *PackageInstaller) beforeInstall() {
 func (pi *PackageInstaller) installPackage(filesProvider UpdateFilesProvider) (err error) {
   log.Println("Installing package...")
 
-  go func() {
-    for bp := range pi.backupsChan {
-      pi.backups[bp.relpath] = bp.newpath
-      pi.backupsWG.Done()
-    }
-    
-    log.Printf("Backups accounting finished. %v backups available", len(pi.backups))
-  }()
+  go pi.processBackups()  
   
   defer func() {
-    log.Println("Stopping backups accounting routine...")
     close(pi.backupsChan)
   }()
 
-  pi.progressReporter.systemMessageChan <- "Removing components"
+  pi.progressReporter.systemMessageChan <- "Removing components..."
   err = pi.removeFiles(filesProvider.FilesToRemove())
   if err != nil {
     return err
   }
 
-  pi.progressReporter.systemMessageChan <- "Updating components"
+  pi.progressReporter.systemMessageChan <- "Updating components..."
   err = pi.updateFiles(filesProvider.FilesToUpdate())
   if err != nil {
     return err
   }
 
-  pi.progressReporter.systemMessageChan <- "Adding components"
+  pi.progressReporter.systemMessageChan <- "Adding components..."
   err = pi.addFiles(filesProvider.FilesToAdd())
   if err != nil {
     return err
@@ -145,6 +148,15 @@ func (pi *PackageInstaller) installPackage(filesProvider UpdateFilesProvider) (e
   pi.backupsWG.Wait()
 
   return err
+}
+
+func (pi *PackageInstaller) processBackups() {
+  for bp := range pi.backupsChan {
+    pi.backups[bp.relpath] = bp.newpath
+    pi.backupsWG.Done()
+  }
+  
+  log.Printf("Backups accounting finished. %v backups available", len(pi.backups))
 }
 
 func (pi *PackageInstaller) afterSuccess() {
@@ -275,72 +287,37 @@ func (pi *PackageInstaller) removeBackups() {
     if backuppath, ok := pi.backups[selfpath]; ok {
       pi.removeSelfPath = backuppath
       delete(pi.backups, selfpath)
-      log.Printf("Removed exe path %v from backups", selfpath)
+      log.Printf("Removed exe path %v from backups. %v backups left", selfpath, len(pi.backups))
     }
   }
 
-  var wg sync.WaitGroup
-
   for _, backuppath := range pi.backups {
-    wg.Add(1)
+    log.Printf("Removing %v", backuppath)
+    err := os.Remove(backuppath)
+    if err != nil {
+      log.Printf("Error while removing %v: %v", backuppath, err)
+    }
 
-    go func(pathToRemove string) {
-      defer wg.Done()
-
-      err := os.Remove(pathToRemove)
-      if err != nil {
-        log.Printf("Error while removing %v: %v", pathToRemove, err)
-      }
-
-      pi.progressReporter.accountBackupRemove()
-    }(backuppath)
+    pi.progressReporter.accountBackupRemove()
   }
-
-  wg.Wait()
 }
 
 func (pi *PackageInstaller) removeFiles(files []*UpdateFileInfo) error {
   log.Printf("Removing %v files", len(files))
 
-  var wg sync.WaitGroup
-  errc := make(chan error)
-  done := make(chan bool)
-
   for _, fi := range files {
-    wg.Add(1)
     pathToRemove, filesize := fi.Filepath, fi.FileSize
 
-    go func() {
-      defer wg.Done()
+    fullpath := filepath.Join(pi.installDir, pathToRemove)
+    log.Printf("Removing file %v", fullpath)
 
-      select {
-      case <-done: return
-      default:
-      }
+    err := pi.backupFile(pathToRemove)
 
-      fullpath := filepath.Join(pi.installDir, pathToRemove)
-      log.Printf("Removing file %v", fullpath)
-
-      err := pi.backupFile(pathToRemove)
-
-      if err != nil {
-        log.Printf("Removing file %v failed: %v", pathToRemove, err)
-        errc <- err
-        close(done)
-      } else {
-        pi.progressReporter.accountRemove(filesize)
-      }
-    }()
-  }
-
-  go func() {
-    errc <- nil
-  }()
-
-  wg.Wait()
-
-  if err := <-errc; err != nil {
-    return err
+    if err != nil {
+      log.Printf("Removing file %v failed: %v", pathToRemove, err)      
+    } else {
+      pi.progressReporter.accountRemove(filesize)
+    }
   }
 
   return nil
@@ -349,53 +326,26 @@ func (pi *PackageInstaller) removeFiles(files []*UpdateFileInfo) error {
 func (pi *PackageInstaller) updateFiles(files []*UpdateFileInfo) error {
   log.Printf("Updating %v files", len(files))
 
-  var wg sync.WaitGroup
-  errc := make(chan error)
-  done := make(chan bool)
-
   for _, fi := range files {
-    wg.Add(1)
-
     pathToUpdate, filesize := fi.Filepath, fi.FileSize
 
-    go func() {
-      defer wg.Done()
+    oldpath := path.Join(pi.installDir, pathToUpdate)
+    log.Printf("Updating file %v", oldpath)
 
-      select {
-      case <-done: return
-      default:
-      }
+    err := pi.backupFile(pathToUpdate)
 
-      oldpath := path.Join(pi.installDir, pathToUpdate)
-      log.Printf("Updating file %v", oldpath)
+    if err == nil {
+      newpath := path.Join(pi.packageDir, pathToUpdate)
+      os.Remove(oldpath)
+      err = copyFile(newpath, oldpath)
+    }
 
-      err := pi.backupFile(pathToUpdate)
-
-      if err == nil {
-        newpath := path.Join(pi.packageDir, pathToUpdate)
-        os.Remove(oldpath)
-        err = copyFile(newpath, oldpath)
-      }
-
-      if err != nil {
-        log.Printf("Updating file %v failed", pathToUpdate)
-        log.Println(err)
-        errc <- err
-        close(done)
-      } else {
-        pi.progressReporter.accountUpdate(filesize)
-      }
-    }()
-  }
-
-  go func() {
-    errc <- nil
-  }()
-
-  wg.Wait()
-
-  if err := <-errc; err != nil {
-    return err
+    if err != nil {
+      log.Printf("Updating file %v failed: %v", pathToUpdate, err)
+      return err
+    } else {
+      pi.progressReporter.accountUpdate(filesize)
+    }
   }
 
   return nil
@@ -404,51 +354,25 @@ func (pi *PackageInstaller) updateFiles(files []*UpdateFileInfo) error {
 func (pi *PackageInstaller) addFiles(files []*UpdateFileInfo) error {
   log.Printf("Adding %v files", len(files))
 
-  var wg sync.WaitGroup
-  errc := make(chan error)
-  done := make(chan bool)
-
   for _, fi := range files {
-    wg.Add(1)
-
     pathToAdd, filesize := fi.Filepath, fi.FileSize
 
-    go func() {
-      defer wg.Done()
+    oldpath := path.Join(pi.installDir, pathToAdd)
+    ensureDirExists(oldpath)
 
-      select {
-      case <-done: return
-      default:
-      }
+    log.Printf("Adding file %v", pathToAdd)
 
-      oldpath := path.Join(pi.installDir, pathToAdd)
-      ensureDirExists(oldpath)
+    newpath := path.Join(pi.packageDir, pathToAdd)
+    err := copyFile(newpath, oldpath)
 
-      newpath := path.Join(pi.packageDir, pathToAdd)
-      err := copyFile(newpath, oldpath)
-      
-      log.Printf("Adding file %v", pathToAdd)
-
-      if err != nil {
-        log.Printf("Adding file %v failed: %v", pathToAdd, err)
-        errc <- err
-        close(done)
-      } else {
-        pi.progressReporter.accountAdd(filesize)
-      }
-    }()
+    if err != nil {
+      log.Printf("Adding file %v failed: %v", pathToAdd, err)
+      return err
+    } else {
+      pi.progressReporter.accountAdd(filesize)
+    }
   }
-
-  go func() {
-    errc <- nil
-  }()
-
-  wg.Wait()
-
-  if err := <-errc; err != nil {
-    return err
-  }
-
+  
   return nil
 }
 
@@ -491,6 +415,7 @@ func purgeFiles(root string, files []*UpdateFileInfo) {
 }
 
 func ensureDirExists(fullpath string) (err error) {
+  log.Printf("Ensuring directory exists for %v", fullpath)
   dirpath := path.Dir(fullpath)
   err = os.MkdirAll(dirpath, os.ModeDir)
   if err != nil {

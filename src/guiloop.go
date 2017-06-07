@@ -30,3 +30,7 @@ func guiinit() {
 func guiloop() {
   <- finished
 }
+
+func guifinish() {
+  finished <- true
+}

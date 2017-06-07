@@ -28,8 +28,7 @@ func (ph *WinUIProgressHandler) HandleSystemMessage(msg string) {
 }
 
 func (ph *WinUIProgressHandler) HandleFinish() {
-  guifinished <- true
-  gform.Exit()
+  guifinish()
 }
 
 func guiinit() {
@@ -64,4 +63,9 @@ func guiloop() {
 
 func init() {
   guifinished = make(chan bool)
+}
+
+func guifinish() {
+  guifinished <- true
+  gform.Exit()
 }

@@ -17,6 +17,7 @@ clone_depth: 3                      # clone entire repository history if not def
 before_build:
   - go version
   - go get github.com/Ribtoks/gform
+  - go get gopkg.in/natefinch/lumberjack.v2
 
 build_script:
   - cmd: 'cd src'

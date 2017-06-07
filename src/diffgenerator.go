@@ -50,7 +50,7 @@ func (df DiffGenerator) FilesToRemove() []*UpdateFileInfo {
 func (df *DiffGenerator) GenerateDiffs() error {
   err := df.calculateHashes()
   if err != nil {
-    log.Fatal(err)
+    log.Panic(err)
   }
 
   var wg sync.WaitGroup
@@ -140,7 +140,7 @@ func (df *DiffGenerator) findFilesToRemoveOrUpdate(installDir, packageDir string
       defer wg.Done()
 
       relativePath, err := filepath.Rel(df.installDirPath, path)
-      if err != nil { log.Fatal(err) }
+      if err != nil { log.Panic(err) }
       relativePath = filepath.ToSlash(relativePath)
       packagePath := filepath.Join(df.packageDirPath, relativePath)
       installFileHash := df.installDirHashes[relativePath]
@@ -194,7 +194,7 @@ func (df *DiffGenerator) findFilesToAdd(installDir, packageDir string) {
       defer wg.Done()
 
       relativePath, err := filepath.Rel(df.packageDirPath, path)
-      if err != nil { log.Fatal(err) }
+      if err != nil { log.Panic(err) }
       relativePath = filepath.ToSlash(relativePath)
       installPath := filepath.Join(df.installDirPath, relativePath)
 

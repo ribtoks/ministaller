@@ -1,7 +1,6 @@
 package main
 
 import (
-  "fmt"
   "log"
   "flag"
   "os"
@@ -12,6 +11,7 @@ import (
   "io/ioutil"
   "os/exec"
   "net/http"
+  "gopkg.in/natefinch/lumberjack.v2"
 )
 
 // flags
@@ -139,6 +139,12 @@ func main() {
   defer pi.removeSelfIfNeeded()
 
   if *showUIFlag {
+    defer func() {
+      if r := recover(); r != nil {
+        guifinish()
+      }
+    }()  
+    
     guiinit()
     go doInstall(pi, df)
     guiloop()
@@ -193,19 +199,13 @@ func parseFlags() error {
 }
 
 func setupLogging() (f *os.File, err error) {
-  f, err = os.OpenFile(*logPathFlag, os.O_RDWR | os.O_CREATE | os.O_APPEND, 0666)
-  if err != nil {
-    fmt.Println("error opening file: %v", *logPathFlag)
-    return nil, err
-  }
-
-  if *stdoutFlag {
-    mw := io.MultiWriter(os.Stdout, f)
-    log.SetOutput(mw)
-  } else {
-    log.SetOutput(f)
-  }
-
+  log.SetOutput(&lumberjack.Logger{
+    Filename:   *logPathFlag,
+    MaxSize:    10, // megabytes
+    MaxBackups: 3,
+    MaxAge:     28, //days
+  })
+  
   log.Println("------------------------------")
   log.Println("Ministaller log started")
 

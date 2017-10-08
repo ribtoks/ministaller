@@ -1,8 +1,8 @@
 package main
 
 import (
-  "github.com/Ribtoks/gform"
-  "github.com/Ribtoks/w32"
+  "github.com/ribtoks/gform"
+  "github.com/ribtoks/w32"
 )
 
 var (

@@ -4,6 +4,7 @@ Lightweight installer/updater for desktop application written in Go
 ![alt tag](https://raw.githubusercontent.com/Ribtoks/ministaller/master/ministaller.png)
 
 [![Build status](https://ci.appveyor.com/api/projects/status/n32q1fas77p0r90j/branch/master?svg=true)](https://ci.appveyor.com/project/Ribtoks/ministaller/branch/master)
+[![Codacy Badge](https://api.codacy.com/project/badge/Grade/8636089d05bf4d9dbaa49cd8499f4326)](https://www.codacy.com/app/ribtoks/ministaller)
 
 ## Description
 

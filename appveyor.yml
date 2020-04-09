@@ -20,7 +20,6 @@ before_build:
   - go get gopkg.in/natefinch/lumberjack.v2
 
 build_script:
-  - cmd: 'cd src'
   - go build -o ministaller.exe
 
 after_build:
@@ -29,7 +28,7 @@ after_build:
   - appveyor PushArtifact ministaller-latest.zip
 
 before_test:
-  - cmd: 'cd c:\projects\ministaller\src'
+  - cmd: 'cd c:\projects\ministaller'
   - ps: wget 'https://github.com/Ribtoks/xpiks/releases/download/v1.1/Xpiks-qt-v1.1.3.zip' -OutFile "$pwd\xpiks-qt-v1.1.3.zip"
   - ps: 7z.exe x xpiks-qt-v1.1.3.zip -oC:\xpiks-qt-v1.1.3
   - ps: 7z.exe x xpiks-qt-v1.1.3.zip -oC:\xpiks-qt-v1.1.3-revert

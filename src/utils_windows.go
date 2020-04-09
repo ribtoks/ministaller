@@ -1,16 +1,16 @@
 package main
 
 import (
+	"os"
+	"os/exec"
+	"path/filepath"
 	"syscall"
 	"unicode/utf16"
 	"unsafe"
-  "os"
-  "os/exec"
-  "path/filepath"
 )
 
 var (
-	kernel = syscall.MustLoadDLL("kernel32.dll")
+	kernel                = syscall.MustLoadDLL("kernel32.dll")
 	getModuleFileNameProc = kernel.MustFindProc("GetModuleFileNameW")
 )
 
@@ -29,10 +29,10 @@ func getModuleFileName() (string, error) {
 }
 
 func executablePath() string {
-  exepath, err := getModuleFileName()
-  if err != nil {
-    exepath, _ = exec.LookPath(os.Args[0])
-  }
+	exepath, err := getModuleFileName()
+	if err != nil {
+		exepath, _ = exec.LookPath(os.Args[0])
+	}
 
-  return filepath.ToSlash(exepath)
+	return filepath.ToSlash(exepath)
 }

@@ -3,34 +3,34 @@
 package main
 
 import (
-  "log"
+	"log"
 )
 
 var (
-  finished = make(chan bool)
+	finished = make(chan bool)
 )
 
 func NewUIProgressHandler() ProgressHandler {
-  return &UIProgressHandler{}
+	return &UIProgressHandler{}
 }
 
 type UIProgressHandler struct {
-  LogProgressHandler
+	LogProgressHandler
 }
 
 func (ph *UIProgressHandler) HandleFinish() {
-  log.Printf("Finished")
-  finished <- true
+	log.Printf("Finished")
+	finished <- true
 }
 
 func guiinit() {
-  // do nothing
+	// do nothing
 }
 
 func guiloop() {
-  <- finished
+	<-finished
 }
 
 func guifinish() {
-  finished <- true
+	finished <- true
 }

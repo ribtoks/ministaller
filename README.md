@@ -16,9 +16,9 @@ It compiles to a fully standalone executable which can be distributed along with
 
 ### General instructions
 
-    go get github.com/Ribtoks/gform
-    git clone https://github.com/Ribtoks/ministaller.git
-    cd ministaller/src
+    go get github.com/ribtoks/gform
+    git clone https://github.com/ribtoks/ministaller.git
+    cd ministaller
     go build -o ministaller.exe -ldflags="-H windowsgui"
     
 Check out the `appveyor.yml` file for detailed build instructions.

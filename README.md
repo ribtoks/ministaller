@@ -36,26 +36,31 @@ and only then build _ministaller_.
 
 Command line switches:
 
-    -install-path string
-        Path to the existing installation directory
-    -package-path string
+    Usage of ./ministaller:
+      -fail
+        Fail after install to test rollback
+      -force-update
+        Overwrite same files
+      -gui
+        Show simple progress GUI
+      -hash string
+        Hash of the downloaded file to check
+      -install-path string
+        Path to the existing installation
+      -keep-missing
+        Keep files not found in the update package
+      -l string
+        absolute path to log file (default "ministaller.log")
+      -launch-args string
+        arguments for launch-exe
+      -launch-exe string
+        relative path to exe to launch after install
+      -package-path string
         Path to package with updates
-    -keep-missing
-        Keep local files not found in the update package
-    -force-update
-        Overwrite same files if found locally and in the update
-    -gui
-        Show simple progress GUI (works only for Windows at this time)
-    -l string
-        Absolute path to the log file (default "ministaller.log")
-    -launch-exe string
-        Relative path to the exe to launch after install
-    -stdout
+      -stdout
         Log to stdout and to logfile
-    -url string
-        Url to the package to download (instead of -package-path switch)
-    -hash string
-        SHA1 Hash of the downloaded file to check
+      -url string
+        Url to the package
 
 Sample usage from Qt application is:
 

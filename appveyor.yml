@@ -18,7 +18,7 @@ before_build:
   - go version
 
 build_script:
-  - cd bin/ministaller
+  - cd bin\ministaller
   - env GOFLAGS="-mod=vendor" go build -o ministaller.exe
 
 after_build:

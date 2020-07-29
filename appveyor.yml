@@ -18,7 +18,8 @@ before_build:
   - go version
 
 build_script:
-  - env GOFLAGS="-mod=vendor" go build -o bin/ministaller cmd/ministaller/*.go
+  - cd bin/ministaller
+  - env GOFLAGS="-mod=vendor" go build -o ministaller.exe
 
 after_build:
   - cmd: 'echo %cd%'

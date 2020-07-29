@@ -1,0 +1,9 @@
+# github.com/ribtoks/gform v0.0.0-20171008190928-632039b45d47
+## explicit
+github.com/ribtoks/gform
+# github.com/ribtoks/w32 v0.0.0-20161110083638-059610a2aaa4
+## explicit
+github.com/ribtoks/w32
+# gopkg.in/natefinch/lumberjack.v2 v2.0.0
+## explicit
+gopkg.in/natefinch/lumberjack.v2

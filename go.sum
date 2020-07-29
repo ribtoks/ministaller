@@ -1,0 +1,6 @@
+github.com/ribtoks/gform v0.0.0-20171008190928-632039b45d47 h1:knSrtlDUf3gRz1rKN7wueVsQCktAEJ1mqVeQBaBA6Vk=
+github.com/ribtoks/gform v0.0.0-20171008190928-632039b45d47/go.mod h1:WtECdkLcwAkMpwAxElGLJ1r8vYZMoKZxr0ZUC3l8nMo=
+github.com/ribtoks/w32 v0.0.0-20161110083638-059610a2aaa4 h1:N9T4EJ8jQLknl1bKD92ydLuKjHzfBe6v1EpE2M7rLWE=
+github.com/ribtoks/w32 v0.0.0-20161110083638-059610a2aaa4/go.mod h1:th3hUI51SpDy3IER5XcvjAZ6OoQjwmMdAZd2rSENlk4=
+gopkg.in/natefinch/lumberjack.v2 v2.0.0 h1:1Lc07Kr7qY4U2YPouBjpCLxpiyxIVoxqXgkXLknAOE8=
+gopkg.in/natefinch/lumberjack.v2 v2.0.0/go.mod h1:l0ndWWf7gzL7RNwBG7wST/UCcT4T24xpD6X8LsfU/+k=

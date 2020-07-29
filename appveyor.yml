@@ -16,11 +16,9 @@ clone_depth: 3                      # clone entire repository history if not def
 
 before_build:
   - go version
-  - go get github.com/ribtoks/gform
-  - go get gopkg.in/natefinch/lumberjack.v2
 
 build_script:
-  - go build -o ministaller.exe
+  - make build
 
 after_build:
   - cmd: 'echo %cd%'
@@ -29,16 +27,16 @@ after_build:
 
 before_test:
   - cmd: 'cd c:\projects\ministaller'
-  - ps: wget 'https://github.com/Ribtoks/xpiks/releases/download/v1.1/Xpiks-qt-v1.1.3.zip' -OutFile "$pwd\xpiks-qt-v1.1.3.zip"
-  - ps: 7z.exe x xpiks-qt-v1.1.3.zip -oC:\xpiks-qt-v1.1.3
-  - ps: 7z.exe x xpiks-qt-v1.1.3.zip -oC:\xpiks-qt-v1.1.3-revert
-  - ps: 7z.exe x xpiks-qt-v1.1.3.zip -oC:\xpiks-qt-v1.1.3-orig
-  - ps: wget 'https://github.com/Ribtoks/xpiks/releases/download/v1.3.4/xpiks-qt-v1.3.4.zip' -OutFile "$pwd\xpiks-qt-v1.3.4.zip"
-  - ps: 7z.exe x xpiks-qt-v1.3.4.zip -oC:\xpiks-qt-v1.3.4
+  - ps: wget 'https://github.com/ribtoks/ministaller/archive/cde0bb0e8e79cda774a14a106d992167eb2fa4fe.zip' -OutFile "$pwd\test-archive.zip"
+  - ps: 7z.exe x test-archive.zip -oC:\test-archive
+  - ps: 7z.exe x test-archive.zip -oC:\test-archive-revert
+  - ps: 7z.exe x test-archive.zip -oC:\test-archive-orig
+  - ps: wget 'https://github.com/ribtoks/ministaller/archive/cde0bb0e8e79cda774a14a106d992167eb2fa4fe.zip' -OutFile "$pwd\ministaller-gold.zip"
+  - ps: 7z.exe x ministaller-gold.zip -oC:\ministaller-gold
 
 test_script:
   - cmd: 'echo %cd%'
-  - cmd: 'ministaller.exe -url "https://github.com/Ribtoks/xpiks/releases/download/v1.3.4/xpiks-qt-v1.3.4.zip" -hash "ea3c9864af5702fe835c9005aebaacea47717dc3" -stdout -install-path "c:/xpiks-qt-v1.1.3/xpiks-qt-v1.1.3"'
-  - diff -r c:\xpiks-qt-v1.1.3\xpiks-qt-v1.1.3 c:\xpiks-qt-v1.3.4\xpiks-qt-v1.3.4
-  - cmd: 'ministaller.exe -stdout -install-path "c:/xpiks-qt-v1.1.3-revert/xpiks-qt-v1.1.3" -package-path "xpiks-qt-v1.3.4.zip" -fail'
-  - diff -r c:\xpiks-qt-v1.1.3-revert\xpiks-qt-v1.1.3 c:\xpiks-qt-v1.1.3-orig\xpiks-qt-v1.1.3
+  - cmd: 'ministaller.exe -url "https://github.com/ribtoks/ministaller/archive/cde0bb0e8e79cda774a14a106d992167eb2fa4fe.zip" -hash "1128ba06af51792b5f90ca0ba2884feb86b99dac" -stdout -install-path "c:/ministaller/test"'
+  - diff -r c:\ministaller\test c:\ministaller-gold
+  - cmd: 'ministaller.exe -stdout -install-path "c:/ministaller/test-revert" -package-path "xpiks-qt-v1.3.4.zip" -fail'
+  - diff -r c:\ministaller\test-revert c:\ministaller-orig\xpiks-qt-v1.1.3

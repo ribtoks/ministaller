@@ -18,7 +18,7 @@ before_build:
   - go version
 
 build_script:
-  - cd bin\ministaller
+  - cd cmd\ministaller
   - env GOFLAGS="-mod=vendor" go build -o ministaller.exe
 
 after_build:
@@ -37,7 +37,7 @@ before_test:
 
 test_script:
   - cmd: 'echo %cd%'
-  - cmd: 'bin\ministaller.exe -url "https://github.com/ribtoks/ministaller/archive/3038acf6b2aa169a4dc15e2e584ff78463c47c19.zip" -hash "5960b813144b332f59f214e46ecb359587d0a7ad" -stdout -install-path "c:/ministaller/test"'
+  - cmd: 'cmd\ministaller.exe -url "https://github.com/ribtoks/ministaller/archive/3038acf6b2aa169a4dc15e2e584ff78463c47c19.zip" -hash "5960b813144b332f59f214e46ecb359587d0a7ad" -stdout -install-path "c:/ministaller/test"'
   - diff -r c:\ministaller\test c:\ministaller-gold
-  - cmd: 'bin\ministaller.exe -stdout -install-path "c:/test-archive-revert" -package-path "3038acf6b2aa169a4dc15e2e584ff78463c47c19.zip" -fail'
+  - cmd: 'cmd\ministaller.exe -stdout -install-path "c:/test-archive-revert" -package-path "3038acf6b2aa169a4dc15e2e584ff78463c47c19.zip" -fail'
   - diff -r c:\test-archive-revert c:\test-archive-orig

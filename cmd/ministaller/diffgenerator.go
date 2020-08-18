@@ -174,11 +174,14 @@ func (df *DiffGenerator) findFilesToRemoveOrUpdate(installDir, packageDir string
 					return
 				}
 
-				if !df.keepMissing {
-					efi, _ := os.Stat(path)
-					ufi.FileSize = efi.Size()
-					df.filesToRemoveQueue <- ufi
+				if df.keepMissing {
+					log.Printf("Keeping missing file. path=%v", relativePath)
+					return
 				}
+
+				efi, _ := os.Stat(path)
+				ufi.FileSize = efi.Size()
+				df.filesToRemoveQueue <- ufi
 			} else {
 				packageFileHash := df.packageDirHashes[relativePath]
 

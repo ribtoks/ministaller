@@ -4,6 +4,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sync"
 )
 
@@ -31,6 +32,7 @@ type DiffGenerator struct {
 	packageDirHashes   map[string]string
 	installDirPath     string
 	packageDirPath     string
+	exclude            []*regexp.Regexp
 	keepMissing        bool
 	forceUpdate        bool
 }
@@ -61,7 +63,7 @@ func (df *DiffGenerator) GenerateDiffs() error {
 			df.filesToAdd = append(df.filesToAdd, fi)
 		}
 
-		log.Printf("Found %v files to add", len(df.filesToAdd))
+		log.Printf("Found files to add. count=%v", len(df.filesToAdd))
 		wg.Done()
 	}()
 
@@ -71,7 +73,7 @@ func (df *DiffGenerator) GenerateDiffs() error {
 			df.filesToRemove = append(df.filesToRemove, fi)
 		}
 
-		log.Printf("Found %v files to remove", len(df.filesToRemove))
+		log.Printf("Found files to remove. count=%v", len(df.filesToRemove))
 		wg.Done()
 	}()
 
@@ -81,7 +83,7 @@ func (df *DiffGenerator) GenerateDiffs() error {
 			df.filesToUpdate = append(df.filesToUpdate, fi)
 		}
 
-		log.Printf("Found %v files to update", len(df.filesToUpdate))
+		log.Printf("Found files to update. count=%v", len(df.filesToUpdate))
 		wg.Done()
 	}()
 
@@ -115,8 +117,21 @@ func (df *DiffGenerator) calculateHashes() error {
 	return nil
 }
 
+func (df *DiffGenerator) Excludes(path string) bool {
+	anyMatch := false
+
+	for _, f := range df.exclude {
+		if f.MatchString(path) {
+			anyMatch = true
+			break
+		}
+	}
+
+	return anyMatch
+}
+
 func (df *DiffGenerator) generateDirectoryDiff(installDir, packageDir string) {
-	log.Printf("Install dir: %v, packageDir: %v", installDir, packageDir)
+	log.Printf("Looking for changes. install_dir=%v package_dir=%v", installDir, packageDir)
 
 	go df.findFilesToRemoveOrUpdate(installDir, packageDir)
 	go df.findFilesToAdd(installDir, packageDir)
@@ -149,9 +164,16 @@ func (df *DiffGenerator) findFilesToRemoveOrUpdate(installDir, packageDir string
 
 			ufi := &UpdateFileInfo{
 				Filepath: relativePath,
-				Sha1:     installFileHash}
+				Sha1:     installFileHash,
+			}
 
+			// path does not exist in our package
 			if pfi, err := os.Stat(packagePath); os.IsNotExist(err) {
+				if df.Excludes(relativePath) {
+					log.Printf("Excluded by filters. path=%v", relativePath)
+					return
+				}
+
 				if !df.keepMissing {
 					efi, _ := os.Stat(path)
 					ufi.FileSize = efi.Size()
@@ -171,7 +193,7 @@ func (df *DiffGenerator) findFilesToRemoveOrUpdate(installDir, packageDir string
 	})
 
 	if err != nil {
-		log.Printf("Error while update/remove generation: %v", err)
+		log.Printf("Failed to update/remove generation. err=%v", err)
 	}
 
 	wg.Wait()
@@ -218,7 +240,7 @@ func (df *DiffGenerator) findFilesToAdd(installDir, packageDir string) {
 	})
 
 	if err != nil {
-		log.Printf("Error while add generation: %v", err)
+		log.Printf("Failed to generate add patch. err=%v", err)
 	}
 
 	wg.Wait()

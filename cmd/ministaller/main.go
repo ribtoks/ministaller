@@ -11,24 +11,38 @@ import (
 	"os/exec"
 	"path"
 	"path/filepath"
+	"regexp"
+	"strings"
 
 	"gopkg.in/natefinch/lumberjack.v2"
 )
 
+type arrayFlags []string
+
+func (af *arrayFlags) String() string {
+	return strings.Join(*af, " ")
+}
+
+func (af *arrayFlags) Set(value string) error {
+	*af = append(*af, value)
+	return nil
+}
+
 // flags
 var (
-	installPathFlag = flag.String("install-path", "", "Path to the existing installation")
-	packagePathFlag = flag.String("package-path", "", "Path to package with updates")
-	forceUpdateFlag = flag.Bool("force-update", false, "Overwrite same files")
-	keepMissingFlag = flag.Bool("keep-missing", false, "Keep files not found in the update package")
-	logPathFlag     = flag.String("l", "ministaller.log", "absolute path to log file")
-	launchExeFlag   = flag.String("launch-exe", "", "relative path to exe to launch after install")
-	launchArgsFlag  = flag.String("launch-args", "", "arguments for launch-exe")
-	failFlag        = flag.Bool("fail", false, "Fail after install to test rollback")
-	stdoutFlag      = flag.Bool("stdout", false, "Log to stdout and to logfile")
-	urlFlag         = flag.String("url", "", "Url to the package")
-	hashFlag        = flag.String("hash", "", "Hash of the downloaded file to check")
-	showUIFlag      = flag.Bool("gui", false, "Show simple progress GUI")
+	excludePatternsFlag arrayFlags
+	installPathFlag     = flag.String("install-path", "", "Path to the existing installation")
+	packagePathFlag     = flag.String("package-path", "", "Path to package with updates")
+	forceUpdateFlag     = flag.Bool("force-update", false, "Overwrite same files")
+	keepMissingFlag     = flag.Bool("keep-missing", false, "Keep files not found in the update package")
+	logPathFlag         = flag.String("l", "ministaller.log", "absolute path to log file")
+	launchExeFlag       = flag.String("launch-exe", "", "relative path to exe to launch after install")
+	launchArgsFlag      = flag.String("launch-args", "", "arguments for launch-exe")
+	failFlag            = flag.Bool("fail", false, "Fail after install to test rollback")
+	stdoutFlag          = flag.Bool("stdout", false, "Log to stdout and to logfile")
+	urlFlag             = flag.String("url", "", "Url to the package")
+	hashFlag            = flag.String("hash", "", "Hash of the downloaded file to check")
+	showUIFlag          = flag.Bool("gui", false, "Show simple progress GUI")
 )
 
 var (
@@ -53,7 +67,7 @@ func main() {
 	}
 
 	currentExeFullPath = executablePath()
-	log.Println("Current exe path is", currentExeFullPath)
+	log.Printf("Initialization. exe_path=%v", currentExeFullPath)
 
 	pathToArchive := *packagePathFlag
 
@@ -70,7 +84,7 @@ func main() {
 			log.Println(err.Error())
 		} else {
 			if hash != *hashFlag {
-				log.Printf("Hash mismatch! %v expected but %v found", *hashFlag, hash)
+				log.Printf("Hash mismatch! expected=%v found=%v", *hashFlag, hash)
 			} else {
 				log.Println("Download succeeded")
 				pathToArchive = localPath
@@ -92,10 +106,16 @@ func main() {
 
 	packageDirPath = findUsefulDir(packageDirPath)
 	packageDirPath = filepath.ToSlash(packageDirPath)
-	log.Printf("Using %v for package path", packageDirPath)
+	log.Printf("Initialization. package_path=%v", packageDirPath)
 
 	installDirPath := filepath.ToSlash(*installPathFlag)
-	log.Printf("Using %v for install path", installDirPath)
+	log.Printf("Initialization. install_path=%v", installDirPath)
+
+	log.Printf("Initialization. exclude_filters=%v", excludePatternsFlag)
+	efilters := make([]*regexp.Regexp, 0, len(excludePatternsFlag))
+	for _, f := range excludePatternsFlag {
+		efilters = append(efilters, regexp.MustCompile(f))
+	}
 
 	df := &DiffGenerator{
 		filesToAdd:         make([]*UpdateFileInfo, 0),
@@ -109,6 +129,7 @@ func main() {
 		packageDirHashes:   make(map[string]string),
 		installDirPath:     installDirPath,
 		packageDirPath:     packageDirPath,
+		exclude:            efilters,
 		keepMissing:        *keepMissingFlag,
 		forceUpdate:        *forceUpdateFlag}
 
@@ -164,7 +185,7 @@ func doInstall(pi *PackageInstaller, df *DiffGenerator) {
 			launchPostInstallExe()
 		}
 	} else {
-		log.Printf("Install failed: %v", err)
+		log.Printf("Install failed. err=%v", err)
 	}
 }
 
@@ -189,6 +210,7 @@ func findUsefulDir(initialDir string) string {
 }
 
 func parseFlags() error {
+	flag.Var(&excludePatternsFlag, "exclude", "Exclude pattern (can be specified multiple times)")
 	flag.Parse()
 
 	installFileInfo, err := os.Stat(*installPathFlag)
@@ -253,7 +275,7 @@ func downloadFile(remoteAddr string, retryCount int) (string, error) {
 }
 
 func downloadFileOnce(remoteAddr string) (filepath string, err error) {
-	log.Printf("Downloading %v", remoteAddr)
+	log.Printf("Downloading file. addr=%v", remoteAddr)
 
 	tempfile, err := ioutil.TempFile("", appName)
 	if err != nil {
@@ -269,14 +291,14 @@ func downloadFileOnce(remoteAddr string) (filepath string, err error) {
 		return "", err
 	}
 
-	log.Printf("Downloaded %v bytes", n)
+	log.Printf("Downloaded file. bytes=%v", n)
 
 	return tempfile.Name(), nil
 }
 
 func launchPostInstallExe() {
 	fullpath := path.Join(*installPathFlag, *launchExeFlag)
-	log.Printf("Trying to launch %v", fullpath)
+	log.Printf("Trying to launch exe. path=%v", fullpath)
 
 	cmd := exec.Command(fullpath, *launchArgsFlag)
 	err := cmd.Start()

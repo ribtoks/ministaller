@@ -36,6 +36,8 @@ and only then build _ministaller_.
 Command line switches:
 
     Usage of ./ministaller:
+      -exclude value
+    	Exclude pattern (can be specified multiple times)
       -fail
         Fail after install to test rollback
       -force-update

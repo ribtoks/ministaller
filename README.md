@@ -34,34 +34,34 @@ and only then build _ministaller_.
 ## Usage
 
 Command line switches:
-
-    Usage of ./ministaller:
-      -exclude value
+```
+  -exclude value
     	Exclude pattern (can be specified multiple times)
-      -fail
-        Fail after install to test rollback
-      -force-update
-        Overwrite same files
-      -gui
-        Show simple progress GUI
-      -hash string
-        Hash of the downloaded file to check
-      -install-path string
-        Path to the existing installation
-      -keep-missing
-        Keep files not found in the update package
-      -l string
-        absolute path to log file (default "ministaller.log")
-      -launch-args string
-        arguments for launch-exe
-      -launch-exe string
-        relative path to exe to launch after install
-      -package-path string
-        Path to package with updates
-      -stdout
-        Log to stdout and to logfile
-      -url string
-        Url to the package
+  -fail
+    	Fail after install to test rollback
+  -force-update
+    	Overwrite same files
+  -gui
+    	Show simple progress GUI
+  -hash string
+    	Hash of the downloaded file to check
+  -install-path string
+    	Path to the existing installation
+  -keep-missing
+    	Keep files not found in the update package
+  -l string
+    	absolute path to log file (default "ministaller.log")
+  -launch-args string
+    	arguments for launch-exe
+  -launch-exe string
+    	relative path to exe to launch after install
+  -package-path string
+    	Path to package with updates
+  -stdout
+    	Log to stdout and to logfile
+  -url string
+    	Url to the package
+```
 
 Sample usage from Qt application is:
 
